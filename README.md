@@ -32,4 +32,4 @@ When running MAME, you can of course tell MAME which interface address and port 
 will start MAME, listening only on the loopback interface `127.0.0.1` (and thus not be accessible from any other machine) on port `9000` instead of MAME's default port `15112`.
 
 
-`MameVfxFrontPanel` currently builds on Linux using clang 20. It requires `#embed` to embed the HTML and JavaScript source files into the binary.
+`MameVfxFrontPanel` currently builds on Linux with `cmake` using `clang++` 20. It requires support for `#embed` to embed the HTML and JavaScript source files into the binary.
