@@ -292,7 +292,7 @@ var fp = (function() {
 
   my.Display.prototype.showString = function(y, x, s) {
     for (var i = 0; i < s.length; i++) {
-      this.setChar(y, x, s.charCodeAt(i), false, false);
+      this.setChar(y, x, s.charCodeAt(i) - 0x20, false, false);
       x++;
       if (x >= this.cells[y].length) {
         x = 0;
@@ -757,6 +757,11 @@ var fp = (function() {
       }
     }
 
+    my.Panel.prototype.showMessage = function(message) {
+      this.display.clear();
+      this.display.showString(0, 0, message);
+    }
+
     my.Panel.prototype.connect = function() {
       var that = this;
       var panel = this;
@@ -801,6 +806,8 @@ var fp = (function() {
 
       this.socket.onclose = function(event) {
         console.log("closed: ", event);
+        panel.showMessage("Reconnecting to server ...");
+        panel.needRefresh = true;
         // reconnect after 1 second
         setTimeout(reconnect, 1000);
       };
@@ -1177,11 +1184,12 @@ var fp = (function() {
         // we need to reload, forcing a refresh from the server.
         console.log(`keyboard '${keyboard}' vs '${this.keyboard}', version '${version}' vs '${this.version}', would reload`);
 
-        reload = function() {
-          document.location.reload(true);
-        };
-
-        setTimeout(reload, 10000);
+        // For debugging purposes:
+        // If this goes into a loop of reloading over and over,
+        // increasing reload_timeout may let you catch the javascript console log
+        // (which gets cleared by reloading the page).
+        const reload_timeout = 0;
+        setTimeout(function() { document.location.reload(true); }, reload_timeout); // immediately reload
       }
     }
 

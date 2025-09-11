@@ -28,11 +28,6 @@ static const char js[] {
 };
 
 static const char WS_URL[] = "/socket";
-static const char *SERVER_OPTIONS[] = {
-  "listening_ports", "8081", 
-  "num_threads", "10", 
-  NULL, NULL
-};
 
 static int connection_counter = 0;
 
@@ -42,11 +37,41 @@ struct WSClient {
   struct mg_connection *m_connection;
   int m_connection_number;
   bool m_ready = false;
+  std::optional<std::string> m_showing_message;
+
+  void send(const char *data, size_t len) {
+    if (m_connection && m_ready) {
+      mg_websocket_write(m_connection, MG_WEBSOCKET_OPCODE_TEXT, data, len);
+    }
+    m_showing_message.reset();
+  }
+
+  void send(const std::string &message) {
+    send(message.data(), message.length());
+  }
+
+  void show_message(const std::string &message) {
+    std::cout << std::format("Want to show '{}', ", message);
+    if (!m_showing_message || message != m_showing_message.value()) {
+      std::cout << "clearing screen, ";
+      send("DX", 2);
+      std::cout << "sending message, ";
+      send(message);
+      m_showing_message = message;
+    } else {
+      std::cout << std::format("currently showing '{}', ", m_showing_message ? m_showing_message.value() : "<nothing>");
+    }
+    std::cout << std::format("now showing '{}'", m_showing_message.value()) << std::endl;
+  }
 };
 
 struct Server {
+  std::string mame_host;
+  std::string mame_port;
+
   // Also used for locking.
   struct mg_context *m_mg_ctx = nullptr;
+
   std::unordered_set<WSClient *> m_ws_clients;
   int m_mame_socket = -1;
   std::map<std::string, std::string> m_template_values;
@@ -62,10 +87,7 @@ struct Server {
   void send_to_all_clients(const char *data, size_t len, struct mg_connection *except = nullptr) {
     lock();
     for (const auto &c: m_ws_clients) {
-      // printf("Sending to client %d\r\n", c->m_connection_number);
-      if (c->m_connection && c->m_connection != except && c->m_ready) {
-        mg_websocket_write(c->m_connection, MG_WEBSOCKET_OPCODE_TEXT, (const char *)data, len);
-      }
+      c->send(data, len);
     }
     unlock();
   }
@@ -125,7 +147,7 @@ struct Server {
 
   void handle_server_info(std::string_view &message) {
     // try to parse this as server info
-    std::cout << std::format("Maybe Server info: '{}' ({})\r\n", message, message.size());
+    // std::cout << std::format("Maybe Server info: '{}' ({})\r\n", message, message.size());
     auto b = message.begin();
     auto i = message.find("I");
     if (i == 0) {
@@ -136,14 +158,30 @@ struct Server {
           auto keyboard = message.substr(kbs, comma - kbs);
           auto version = message.substr(comma + 1);
 
-          std::cout << std::format("Have Server info! keyboard '{}' ({}), version '{}' ({})\r\n", 
-            keyboard, keyboard.size(), version, version.size());
+          // std::cout << std::format("Have Server info! keyboard '{}' ({}), version '{}' ({})\r\n", 
+          //   keyboard, keyboard.size(), version, version.size());
           set_template_value("keyboard", keyboard);
           set_template_value("version", version);
         }
       }
     }
   }
+
+  template<typename T>
+  void show_message(T &message) {
+    std::stringstream os;
+    os << "DC 0 0";
+    for (const auto &c : message) {
+      os << std::format(" {:02x} 0", c - ' ');
+    }
+
+    lock();
+    for (const auto &c: m_ws_clients) {
+      c->show_message(os.str());
+    }
+    unlock();
+  }
+
 };
 
 /**
@@ -201,7 +239,7 @@ static int ws_connect_handler(const struct mg_connection *conn, void *user_data)
 
   /* DEBUG: New client connected (but not ready to receive data yet). */
   const struct mg_request_info *ri = mg_get_request_info(conn);
-  printf("Client %u connected\n", client->m_connection_number);
+  // printf("Client %u connected\n", client->m_connection_number);
 
   return 0;
 }
@@ -218,7 +256,7 @@ static void ws_ready_handler(struct mg_connection *conn, void *user_data) {
   (void)ri; /* in this example, we do not need the request_info */
 
   /* DEBUG: New client ready to receive data. */
-  printf("Client %u ready to receive data\n", client->m_connection_number);
+  // printf("Client %u ready to receive data\n", client->m_connection_number);
 }
 
 /* Handler indicating the client sent data to the server. */
@@ -398,7 +436,7 @@ bool read_from_mame(int sfd, char &c) {
 
   while (true) {
     // printf("p"); fflush(stdout);
-    if ((nfds = poll(&pfd, 1, 1000)) >= 0) {
+    if ((nfds = poll(&pfd, 1, 10000)) >= 0) {
       // printf("%d", nfds); fflush(stdout);
       if (nfds == 0) {
         // timeout
@@ -428,8 +466,14 @@ bool read_from_mame(int sfd, char &c) {
 }
 
 void talk_to_mame(Server *server) {
+  bool first_connection = true;
   while (true) {
     printf("Connecting to MAME ...\r\n");
+
+    if (first_connection) 
+      server->show_message("Connecting to MAME ...");
+    else
+      server->show_message("Reconnecting to MAME ...");
 
     /* First we set up the connection to MAME */
 
@@ -441,12 +485,11 @@ void talk_to_mame(Server *server) {
     hints.ai_flags = 0;
     hints.ai_protocol = 0;           /* Any protocol */
 
-    int ar = getaddrinfo("localhost", "9000", &hints, &result);
+    int ar = getaddrinfo(server->mame_host.c_str(), server->mame_port.c_str(), &hints, &result);
 
     struct pollfd pfd {0};
 
     for (rp = result; rp != NULL; rp = rp->ai_next) {
-      printf("Trying socket(%d, %d, %d)\r\n", rp->ai_family, rp->ai_socktype, rp->ai_protocol);
       sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
       if (sfd == -1) {
         printf("Failed to create socket, trying next one\r\n");
@@ -455,9 +498,9 @@ void talk_to_mame(Server *server) {
 
       // fcntl(sfd, F_SETFL, O_NONBLOCK);
 
-      printf("Trying connect(%d, ", sfd);
+      printf("Trying to connect to ");
       print_addrinfo(rp);
-      printf(")\r\n");
+      printf("\r\n");
 
       connect(sfd, rp->ai_addr, rp->ai_addrlen);
 
@@ -469,24 +512,21 @@ void talk_to_mame(Server *server) {
         break;                  /* Success */
       }
 
-      printf("Connection failed ...\r\n");
+      printf("Connection failed.\r\n");
       close(sfd);
     }
 
-    freeaddrinfo(result);           /* No lonkeyboarger needed */
-
-    int so_error;
-    socklen_t len = sizeof so_error;
-    getsockopt(sfd, SOL_SOCKET, SO_ERROR, &so_error, &len);
-    printf("so_error = %x\r\n", so_error);
+    freeaddrinfo(result);           /* No longer needed */
 
     if (rp == NULL) {               /* No address succeeded */
-      fprintf(stderr, "Could not connect\n");
+      fprintf(stderr, "Could not connect.\n");
       sleep(1);
       continue;
     }
 
     // Connected!
+
+    first_connection = false;
 
     pfd.fd = sfd;
     pfd.events = POLLIN | POLLHUP;
@@ -550,13 +590,75 @@ static int serve_js(struct mg_connection *conn, void *user_data) {
 }
 
 int main(int argc, char *argv[]) {
-
   if (pipe(pipefds)) {
     fprintf(stderr, "Cannot create pipe: %d\n", errno);
     exit(1);
   }
 
-  Server server;
+  std::map<std::string, std::string, std::less<>> options {
+    {"mame_host", "localhost"},
+    {"mame_port", "15112"},
+  };
+
+  static const char *web_server_options[] = {
+    "listening_ports", "8080",
+    "num_threads", "10",
+    nullptr, nullptr,
+  };
+  std::map<std::string, int, std::less<>> web_server_param_indexes { 
+    {"listening_ports", 1},
+    {"num_threads", 3},
+  };
+
+  for (int i = 1; i < argc; i++) {
+    std::string_view arg(argv[i]);
+    if (arg.starts_with("-")) {
+      // advance and grap the value for this flag
+      i++;
+      std::optional<std::string_view> val;
+      if (i < argc)
+        val = std::string_view(argv[i]);
+
+      auto flag = arg.substr(1);
+
+      auto wi = web_server_param_indexes.find(flag);
+      if (wi != web_server_param_indexes.end()) {
+        // this is one of the web server arguments - put it in the table
+        if (val.has_value()) {
+          web_server_options[wi->second] = argv[i];
+        } else {
+          std::cerr << std::format("Missing value for web server flag '{}'", arg) << std::endl;
+          exit(-1);
+        }
+        continue;
+      }
+
+      auto oi = options.find(flag);
+      if (oi != options.end()) {
+        if (val.has_value()) {
+          std::string s_flag(flag);
+          std::string s_val(val.value());
+          options[s_flag] = s_val;
+        } else {
+          std::cerr << std::format("Missing value for flag '{}'", arg) << std::endl;
+          exit(-1);
+        }
+        continue;
+      }
+
+      // if we get here, it's not either a web server or a mame flag!
+      std::cerr << std::format("Unknown flag '{}'", arg) << std::endl;
+      exit(-1);
+    } else {
+      std::cerr << std::format("Unknown argument '{}'", arg) << std::endl;
+      exit(-1);
+    }
+  }
+
+  std::string &mame_host = options["mame_host"];
+  std::string &mame_port = options["mame_port"];
+
+  Server server { mame_host, mame_port };
   // By default, gues it's a VFX, version 0.
   server.set_template_value("keyboard", "vfx");
   server.set_template_value("version", "0");
@@ -574,7 +676,7 @@ int main(int argc, char *argv[]) {
   struct mg_init_data mg_start_init_data = {0};
   mg_start_init_data.callbacks = &callbacks;
   mg_start_init_data.user_data = user_data;
-  mg_start_init_data.configuration_options = SERVER_OPTIONS;
+  mg_start_init_data.configuration_options = web_server_options;
 
   struct mg_error_data mg_start_error_data = {0};
   char errtxtbuf[256] = {0};
@@ -598,6 +700,7 @@ int main(int argc, char *argv[]) {
     ws_close_handler,
     user_data);
   
+  mg_set_request_handler(ctx, "/", serve_html, &server);
   mg_set_request_handler(ctx, "/index.html", serve_html, &server);
   mg_set_request_handler(ctx, "/FrontPanel.html", serve_html, &server);
   mg_set_request_handler(ctx, "/FrontPanel.js", serve_js, &server);
@@ -608,9 +711,7 @@ int main(int argc, char *argv[]) {
   struct pollfd pfd;
   pfd.fd = pipefds[0];
   pfd.events = POLLIN;
-  while (poll(&pfd, 1, 1000) >= 0) {
-    printf(".");
-    fflush(stdout);
+  while (poll(&pfd, 1, 10000) >= 0) {
     pfd.fd = pipefds[0];
     pfd.events = POLLIN;
   }
