@@ -51,17 +51,10 @@ struct WSClient {
   }
 
   void show_message(const std::string &message) {
-    std::cout << std::format("Want to show '{}', ", message);
     if (!m_showing_message || message != m_showing_message.value()) {
-      std::cout << "clearing screen, ";
       send("DX", 2);
-      std::cout << "sending message, ";
       send(message);
-      m_showing_message = message;
-    } else {
-      std::cout << std::format("currently showing '{}', ", m_showing_message ? m_showing_message.value() : "<nothing>");
     }
-    std::cout << std::format("now showing '{}'", m_showing_message.value()) << std::endl;
   }
 };
 
