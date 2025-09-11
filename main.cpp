@@ -187,38 +187,38 @@ void write_template(std::ostream &dst, const char *src, substitution substitute,
 static int ws_connect_handler(const struct mg_connection *conn, void *user_data) {
   Server *server = static_cast<Server *>(user_data);
 
-	/* Allocate data for websocket client context, and initialize context. */
+  /* Allocate data for websocket client context, and initialize context. */
 
   WSClient *client = new WSClient();
-	if (!client) {
-		/* reject client */
-		return 1;
-	}
-	client->m_connection_number = __sync_add_and_fetch(&connection_counter, 1);
-	mg_set_user_connection_data(conn, client); /* client context assigned to connection */
+  if (!client) {
+    /* reject client */
+    return 1;
+  }
+  client->m_connection_number = __sync_add_and_fetch(&connection_counter, 1);
+  mg_set_user_connection_data(conn, client); /* client context assigned to connection */
 
   server->add_client(client);
 
-	/* DEBUG: New client connected (but not ready to receive data yet). */
-	const struct mg_request_info *ri = mg_get_request_info(conn);
-	printf("Client %u connected\n", client->m_connection_number);
+  /* DEBUG: New client connected (but not ready to receive data yet). */
+  const struct mg_request_info *ri = mg_get_request_info(conn);
+  printf("Client %u connected\n", client->m_connection_number);
 
-	return 0;
+  return 0;
 }
 
 /* Handler indicating the client is ready to receive data. */
 static void ws_ready_handler(struct mg_connection *conn, void *user_data) {
   Server *server = static_cast<Server *>(user_data);
 
-	/* Get websocket client context information. */
+  /* Get websocket client context information. */
   WSClient *client = static_cast<WSClient *>(mg_get_user_connection_data(conn));
   client->m_connection = conn;
   client->m_ready = true;
-	const struct mg_request_info *ri = mg_get_request_info(conn);
-	(void)ri; /* in this example, we do not need the request_info */
+  const struct mg_request_info *ri = mg_get_request_info(conn);
+  (void)ri; /* in this example, we do not need the request_info */
 
-	/* DEBUG: New client ready to receive data. */
-	printf("Client %u ready to receive data\n", client->m_connection_number);
+  /* DEBUG: New client ready to receive data. */
+  printf("Client %u ready to receive data\n", client->m_connection_number);
 }
 
 /* Handler indicating the client sent data to the server. */
@@ -229,33 +229,33 @@ static int ws_data_handler(struct mg_connection *conn,
                 void *user_data) {
   Server *server = static_cast<Server *>(user_data);
 
-	/* Get websocket client context information. */
+  /* Get websocket client context information. */
   WSClient *client = static_cast<WSClient *>(mg_get_user_connection_data(conn));
-	const struct mg_request_info *ri = mg_get_request_info(conn);
-	(void)ri; /* in this example, we do not need the request_info */
+  const struct mg_request_info *ri = mg_get_request_info(conn);
+  (void)ri; /* in this example, we do not need the request_info */
 
-	/* DEBUG: Print data received from client. */
-	const char *messageType = "unknown";
-	switch (opcode & 0xf) {
-	case MG_WEBSOCKET_OPCODE_TEXT:
-		messageType = "text";
-		break;
-	case MG_WEBSOCKET_OPCODE_BINARY:
-		messageType = "binary";
-		break;
-	case MG_WEBSOCKET_OPCODE_PING:
-		messageType = "ping";
-		break;
-	case MG_WEBSOCKET_OPCODE_PONG:
-		messageType = "pong";
-		break;
-	}
+  /* DEBUG: Print data received from client. */
+  const char *messageType = "unknown";
+  switch (opcode & 0xf) {
+  case MG_WEBSOCKET_OPCODE_TEXT:
+    messageType = "text";
+    break;
+  case MG_WEBSOCKET_OPCODE_BINARY:
+    messageType = "binary";
+    break;
+  case MG_WEBSOCKET_OPCODE_PING:
+    messageType = "ping";
+    break;
+  case MG_WEBSOCKET_OPCODE_PONG:
+    messageType = "pong";
+    break;
+  }
 
-	// printf("Websocket received %lu bytes of %s (%02x) data from client %u\n",
-	//        (unsigned long)datasize,
-	//        messageType,
+  // printf("Websocket received %lu bytes of %s (%02x) data from client %u\n",
+  //        (unsigned long)datasize,
+  //        messageType,
   //        opcode,
-	//        client->m_connection_number);
+  //        client->m_connection_number);
 
   if ((opcode & 0xf) == MG_WEBSOCKET_OPCODE_TEXT) {
     // text messages: we forward these to MAME
@@ -274,24 +274,24 @@ static int ws_data_handler(struct mg_connection *conn,
     mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_PONG, "pong", 4);
   }
 
-	return 1;
+  return 1;
 }
 
 /* Handler indicating the connection to the client is closing. */
 static void ws_close_handler(const struct mg_connection *conn, void *user_data) {
-	Server *server = static_cast<Server *>(user_data);
+  Server *server = static_cast<Server *>(user_data);
   server->lock();
 
-	/* Get websocket client context information. */
+  /* Get websocket client context information. */
   WSClient *client = static_cast<WSClient *>(mg_get_user_connection_data(conn));
   client->m_connection = nullptr;
 
-	/* DEBUG: Client has left. */
-	printf("Client %u closing connection\n", client->m_connection_number);
+  /* DEBUG: Client has left. */
+  printf("Client %u closing connection\n", client->m_connection_number);
 
   server->remove_client(client);
 
-	/* Free memory allocated for client context in ws_connect_handler() call. */
+  /* Free memory allocated for client context in ws_connect_handler() call. */
   delete client;
 
   server->unlock();
@@ -535,24 +535,24 @@ static int serve_html(struct mg_connection *conn, void *user_data) {
   std::string result = templated.str();
 
   mg_send_http_ok(conn, "text/html", result.length());
-	mg_write(conn, result.data(), result.length());
+  mg_write(conn, result.data(), result.length());
 
-	return 200; /* HTTP state 200 = OK */
+  return 200; /* HTTP state 200 = OK */
 }
 
 static int serve_js(struct mg_connection *conn, void *user_data) {
   Server *server = static_cast<Server *>(user_data);
 
   mg_send_http_ok(conn, "text/javascript", sizeof(js));
-	mg_write(conn, js, sizeof(js));
+  mg_write(conn, js, sizeof(js));
 
-	return 200; /* HTTP state 200 = OK */
+  return 200; /* HTTP state 200 = OK */
 }
 
 int main(int argc, char *argv[]) {
 
   if (pipe(pipefds)) {
-		fprintf(stderr, "Cannot create pipe: %d\n", errno);
+    fprintf(stderr, "Cannot create pipe: %d\n", errno);
     exit(1);
   }
 
@@ -564,33 +564,33 @@ int main(int argc, char *argv[]) {
   printf("Starting MAME connection thread\r\n");
   std::thread mame_thread(talk_to_mame, &server);
 
-	/* Initialize CivetWeb library without OpenSSL/TLS support. */
-	mg_init_library(0);
+  /* Initialize CivetWeb library without OpenSSL/TLS support. */
+  mg_init_library(0);
 
-	/* Start the server using the advanced API. */
-	struct mg_callbacks callbacks = {0};
-	void *user_data = &server;
+  /* Start the server using the advanced API. */
+  struct mg_callbacks callbacks = {0};
+  void *user_data = &server;
 
-	struct mg_init_data mg_start_init_data = {0};
-	mg_start_init_data.callbacks = &callbacks;
-	mg_start_init_data.user_data = user_data;
-	mg_start_init_data.configuration_options = SERVER_OPTIONS;
+  struct mg_init_data mg_start_init_data = {0};
+  mg_start_init_data.callbacks = &callbacks;
+  mg_start_init_data.user_data = user_data;
+  mg_start_init_data.configuration_options = SERVER_OPTIONS;
 
-	struct mg_error_data mg_start_error_data = {0};
-	char errtxtbuf[256] = {0};
-	mg_start_error_data.text = errtxtbuf;
-	mg_start_error_data.text_buffer_size = sizeof(errtxtbuf);
+  struct mg_error_data mg_start_error_data = {0};
+  char errtxtbuf[256] = {0};
+  mg_start_error_data.text = errtxtbuf;
+  mg_start_error_data.text_buffer_size = sizeof(errtxtbuf);
 
-	struct mg_context *ctx =
-	    mg_start2(&mg_start_init_data, &mg_start_error_data);
-	if (!ctx) {
-		fprintf(stderr, "Cannot start server: %s\n", errtxtbuf);
-		mg_exit_library();
-		return 1;
-	}
+  struct mg_context *ctx =
+      mg_start2(&mg_start_init_data, &mg_start_error_data);
+  if (!ctx) {
+    fprintf(stderr, "Cannot start server: %s\n", errtxtbuf);
+    mg_exit_library();
+    return 1;
+  }
 
-	/* Register the websocket callback functions. */
-	mg_set_websocket_handler(ctx,
+  /* Register the websocket callback functions. */
+  mg_set_websocket_handler(ctx,
     "/socket",
     ws_connect_handler,
     ws_ready_handler,
@@ -602,22 +602,22 @@ int main(int argc, char *argv[]) {
   mg_set_request_handler(ctx, "/FrontPanel.html", serve_html, &server);
   mg_set_request_handler(ctx, "/FrontPanel.js", serve_js, &server);
 
-	/* Let the server run. */
-	printf("Websocket server running\n");
+  /* Let the server run. */
+  printf("Websocket server running\n");
 
   struct pollfd pfd;
   pfd.fd = pipefds[0];
   pfd.events = POLLIN;
-	while (poll(&pfd, 1, 1000) >= 0) {
+  while (poll(&pfd, 1, 1000) >= 0) {
     printf(".");
     fflush(stdout);
     pfd.fd = pipefds[0];
     pfd.events = POLLIN;
-	}
-	printf("Websocket server stopping\n");
+  }
+  printf("Websocket server stopping\n");
 
-	/* Stop server, disconnect all clients. Then deinitialize CivetWeb library.
-	 */
-	mg_stop(ctx);
-	mg_exit_library();
+  /* Stop server, disconnect all clients. Then deinitialize CivetWeb library.
+   */
+  mg_stop(ctx);
+  mg_exit_library();
 }
