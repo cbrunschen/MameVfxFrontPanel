@@ -281,7 +281,7 @@ var fp = (function() {
   }
 
   my.Display.prototype.setChar = function(y, x, c, underline, blink) {
-    console.log(`display.setChar(${y}, ${x}, "${c}", ul=${underline}, bl=${blink}`);
+    // console.log(`display.setChar(${y}, ${x}, "${c}", ul=${underline}, bl=${blink}`);
     var cell = this.cells[y][x];
     cell.char = c;
     cell.underline = underline;
@@ -342,6 +342,27 @@ var fp = (function() {
       this.h = h;
     }
 
+    my.Rect.from = function(e) {
+      let x = parseFloat(e.getAttribute('x'));
+      let y = parseFloat(e.getAttribute('y'));
+      let w = parseFloat(e.getAttribute('width'));
+      let h = parseFloat(e.getAttribute('height'));
+      return new my.Rect(x, y, w, h);
+    }
+
+    my.Rect.fromViewBox = function(e) {
+      let parts = e.getAttribute('viewBox').split(' ');
+      let x = parseFloat(parts[0]);
+      let y = parseFloat(parts[1]);
+      let w = parseFloat(parts[2]);
+      let h = parseFloat(parts[3]);
+      return new my.Rect(x, y, w, h);
+    }
+
+    my.Rect.prototype.toString = function() {
+      return `my.Rect(${this.x}, ${this.y}, ${this.w}, ${this.h})`;
+    }
+
     my.Rect.prototype.union = function(other) {
       if (this.w == 0 || this.h == 0) {
         return other;
@@ -358,6 +379,10 @@ var fp = (function() {
 
     my.Rect.prototype.inset = function(dx, dy) {
       return new my.Rect(this.x + dx, this.y + dy, this.w - 2*dx, this.h - 2*dy);
+    }
+
+    my.Rect.prototype.outset = function(dx, dy) {
+      return new my.Rect(this.x - dx, this.y - dy, this.w + 2*dx, this.h + 2*dy);
     }
 
     my.Rect.prototype.offset = function(dx, dy) {
@@ -383,6 +408,17 @@ var fp = (function() {
 
     my.Rect.prototype.getY = function(d) {
       return this.y + d * this.h;
+    }
+
+    my.Rect.prototype.viewBox = function() {
+      return `${this.x} ${this.y} ${this.w} ${this.h}`
+    }
+
+    my.Rect.prototype.applyTo = function(e) {
+      e.setAttribute('x', `${this.x}`);
+      e.setAttribute('y', `${this.y}`);
+      e.setAttribute('width', `${this.w}`);
+      e.setAttribute('height', `${this.h}`);
     }
 
     my.displayRect = new my.Rect(15, 7, 82, 13);
@@ -731,11 +767,39 @@ var fp = (function() {
       this.displayContainer.setAttribute("width", my.displayRect.w);
       this.displayContainer.setAttribute("height", my.displayRect.h);
       this.container.appendChild(this.displayContainer);
+      this.rect = my.displayRect;
 
       this.buttons = new Array();
       this.lightButtons = new Array();
       this.analogControls = new Array();
       this.addControls(keyboard);
+
+      let messageRect = my.Rect.from(this.displayContainer);
+
+      this.messageBox = my.createElement('svg');
+      messageRect.applyTo(this.messageBox);
+      my.hideElement(this.messageBox);
+
+      let messageBackground = my.createElement('rect');
+      this.messageBox.appendChild(messageBackground);
+      messageBackground.setAttribute('width', '100%');
+      messageBackground.setAttribute('height', '100%');
+      messageBackground.setAttribute('fill', '#000000aa');
+
+      this.messageText = my.createElement('text');
+      this.messageBox.appendChild(this.messageText);
+
+      this.messageText.setAttribute('fill', "#aaaaaaff");
+      this.messageText.setAttribute('stroke', 'none');
+      this.messageText.setAttribute('font-size', `${messageRect.h / 2.5}`);
+      this.messageText.setAttribute('font-family', 'Helvetica');
+      this.messageText.setAttribute('font-style', 'italic');
+      this.messageText.setAttribute('text-anchor', 'middle');
+      this.messageText.setAttribute('dominant-baseline', 'middle');
+      this.messageText.setAttribute('x', '50%');
+      this.messageText.setAttribute('y', '50%');
+
+      this.container.appendChild(this.messageBox);
 
       this.serverUrl = serverUrl;
       this.needRefresh = true;
@@ -758,8 +822,15 @@ var fp = (function() {
     }
 
     my.Panel.prototype.showMessage = function(message) {
-      this.display.clear();
-      this.display.showString(0, 0, message);
+      if (message != this.serverMessage) {
+        this.serverMessage = message;
+        this.messageText.replaceChildren(document.createTextNode(message));
+        if (message.length == 0) {
+          my.hideElement(this.messageBox);
+        } else {
+          my.showElement(this.messageBox);
+        }
+      }
     }
 
     my.Panel.prototype.connect = function() {
@@ -772,7 +843,9 @@ var fp = (function() {
       this.socket = new WebSocket(this.serverUrl);
 
       this.socket.onopen = function(event) {
-        console.log("opened: {event}");
+        // console.log("opened: {event}");
+        // clear our 'connecting' message
+        panel.showMessage('');
         panel.sendString("I"); // Request server information
       };
 
@@ -781,7 +854,7 @@ var fp = (function() {
         var c = data[0];
         var rest = data.slice(1).trim();
 
-        console.log(`Handling message '${data}'`);
+        // console.log(`Handling message '${data}'`);
 
         if (c == 'A') {
           // console.log("handling analog value")
@@ -801,11 +874,14 @@ var fp = (function() {
         } else if (c == 'I') {
           // console.log("handling server information");
           panel.handleServerInformation(rest);
+        } else if (c == 'M') {
+          // console.log("handling server message");
+          panel.handleServerMessage(rest);
         }
       };
 
       this.socket.onclose = function(event) {
-        console.log("closed: ", event);
+        // console.log("closed: ", event);
         panel.showMessage("Reconnecting to server ...");
         panel.needRefresh = true;
         // reconnect after 1 second
@@ -813,7 +889,7 @@ var fp = (function() {
       };
 
       this.socket.onerror = function(event) {
-        console.log("error: ", event);
+        console.log("web socket error: ", event);
       };
     }
 
@@ -881,7 +957,7 @@ var fp = (function() {
     }
 
     my.Panel.prototype.addControls = function(keyboard) {
-      console.log("keyboard is '" + keyboard + "'");
+      // console.log("keyboard is '" + keyboard + "'");
 
       // Normalize the keyboard string.
       var hasSeq = false;
@@ -905,7 +981,7 @@ var fp = (function() {
         keyboard = my.Keyboard.VFX;
       }
 
-      console.log("normalized keyboard is '" + keyboard + "'");
+      // console.log("normalized keyboard is '" + keyboard + "'");
 
       var cartString = hasBankSet ? "BankSet" : "Cart";
 
@@ -1013,32 +1089,23 @@ var fp = (function() {
       // Volume slider
       var volumeSlider = this.addSlider(-30, 4, 7, 22, 5, 1.0);
 
-      var r = undefined;
       for (var i = 1; i < this.buttons.length; i++) {
         var button = this.buttons[i];
         if (button != null) {
-          if (r != null) {
-            r = r.union(button.rect);
-          } else {
-            r = button.rect;
-          }
+          this.rect = this.rect.union(button.rect);
         }
       }
-      r = r.union(valueSlider.rect);
-      r = r.union(volumeSlider.rect);
+      this.rect = this.rect.union(valueSlider.rect);
+      this.rect = this.rect.union(volumeSlider.rect);
 
-      r.x -= 2;
-      r.y -= 2;
-      r.w += 4;
-      r.h += 4;
+      this.rect = this.rect.outset(2, 2);
 
-      var viewBox = "" + r.x + " " + r.y + " " + r.w + " " + r.h;
-      this.container.setAttribute("viewBox", viewBox);
+      this.container.setAttribute("viewBox", this.rect.viewBox());
     }
 
     my.Panel.prototype.sendString = function(s) {
       if (this.socket != undefined && this.socket.readyState == WebSocket.OPEN) {
-        console.log(`Sending '${s}'`);
+        // console.log(`Sending '${s}'`);
         this.socket.send(s);
       }
     }
@@ -1066,18 +1133,18 @@ var fp = (function() {
       var c = data[0];
       if (c == 'X') {
         // Clear the screen
-        console.log("Clearing the screen");
+        // console.log("Clearing the screen");
         this.display.clear();
       } else if (c == 'C') {
         // Character data
         var s = data.slice(1).trim();
-        console.log(`Displaying characters: '${s}'`);
+        // console.log(`Displaying characters: '${s}'`);
         var parts = s.split(" ");
-        console.log(`Have ${parts.length} parts`);
+        // console.log(`Have ${parts.length} parts`);
         if (parts.length >= 2) {
           let row = parseInt(parts[0]);
           let column = parseInt(parts[1]);
-          console.log(`Starting at ${row},${column}`);
+          // console.log(`Starting at ${row},${column}`);
           for (i = 2; i < parts.length - 1; i+= 2) {
             let ch = parseInt(parts[i], 16);
             let attr = parseInt(parts[i+1], 16);
@@ -1171,18 +1238,18 @@ var fp = (function() {
 
       var keyboard = parts[0];
       var version = parseInt(parts[1]);
-      console.log(`Server information message '${s}' -> keyboard '${keyboard}' version '${version}'`);
+      // console.log(`Server information message '${s}' -> keyboard '${keyboard}' version '${version}'`);
       if (keyboard == this.keyboard && version == this.version) {
-        console.log(`needRefresh = ${this.needRefresh}`);
+        // console.log(`needRefresh = ${this.needRefresh}`);
         // same keyboard type version - proceed!
         if (this.needRefresh) {
-          console.log("Requesting refresh");
+          // console.log("Requesting refresh");
           this.sendString("CA1B1L1D1"); // Send me analog data, buttons, and display data
           this.needRefresh = false; // presuming the refresh succeeds
         }
       } else {
         // we need to reload, forcing a refresh from the server.
-        console.log(`keyboard '${keyboard}' vs '${this.keyboard}', version '${version}' vs '${this.version}', would reload`);
+        // console.log(`keyboard '${keyboard}' vs '${this.keyboard}', version '${version}' vs '${this.version}', would reload`);
 
         // For debugging purposes:
         // If this goes into a loop of reloading over and over,
@@ -1191,6 +1258,11 @@ var fp = (function() {
         const reload_timeout = 0;
         setTimeout(function() { document.location.reload(true); }, reload_timeout); // immediately reload
       }
+    }
+
+    my.Panel.prototype.handleServerMessage = function(data) {
+      // console.log(`Handling server message: '${data}'`);
+      this.showMessage(data);
     }
 
     return my;

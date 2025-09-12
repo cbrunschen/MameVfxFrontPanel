@@ -16,6 +16,7 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
+#include <string.h>
 
 #include "civetweb.h"
 
@@ -33,30 +34,112 @@ static int connection_counter = 0;
 
 static int pipefds[2] = {0};
 
+template<size_t size>
+struct MessageCollector {
+  std::array<char, size> m_buffer;
+  size_t m_received = 0;
+  size_t m_message_length = 0;
+  bool m_overflow = false;
+
+  void handle(char c) {
+    // printf("Received %02x, overflow=%d\r\n", c, m_overflow);
+    if (m_overflow) {
+      if (c == '\n') {
+        // printf("Found end of overflowing message, restarting.\r\n");
+        m_received = 0;
+        m_overflow = false;
+      } else {
+        // printf("In buffer overflow, ignoring.\r\n");
+      }
+    } else {
+      switch(c) {
+        case '\r': // ignore
+          // printf("ignoring CR\r\n");
+          break;
+
+        case '\n':
+          // printf("LF, have a message of %ld bytes\r\n", m_received);
+          m_message_length = m_received;
+          m_received = 0;
+          break;
+        
+        default:
+          if (m_received >= m_buffer.size()) {
+            // printf("Already have %ld of %ld characters - buffer overflow!\r\n", m_received, m_buffer.size());
+            m_overflow = true;
+            m_message_length = 0;
+            m_received = 0;
+          } else {
+            m_message_length = 0;
+            m_buffer[m_received++] = c;
+            // printf("accumulated character %02x, now have %ld (of max %ld)\r\n", c, m_received, m_buffer.size());
+          }
+      }
+    }
+  }
+
+  bool has_message() { return m_message_length > 0; }
+
+  std::string copy_message() {
+    std::stringstream os;
+    os.write(&m_buffer[0], m_message_length);
+    return os.str();
+  }
+
+  const char *message_data() { return (const char *)&m_buffer[0]; }
+  size_t message_length() { return m_message_length; }
+
+  void clear_message() {
+    m_message_length = m_received = 0;
+    m_overflow = false;
+  }
+};
+
 struct WSClient {
   struct mg_connection *m_connection;
   int m_connection_number;
   bool m_ready = false;
-  std::optional<std::string> m_showing_message;
 
   void send(const char *data, size_t len) {
     if (m_connection && m_ready) {
       mg_websocket_write(m_connection, MG_WEBSOCKET_OPCODE_TEXT, data, len);
     }
-    m_showing_message.reset();
   }
 
   void send(const std::string &message) {
+    // std::cout << std::format("Sending '{}' to client {}", message, m_connection_number) << std::endl;
     send(message.data(), message.length());
   }
-
-  void show_message(const std::string &message) {
-    if (!m_showing_message || message != m_showing_message.value()) {
-      send("DX", 2);
-      send(message);
-    }
-  }
 };
+
+// pre-composed into command format.
+const static std::string connection_state_commands[] {
+  "MConnecting to MAME ...",
+  "MReconnecting to MAME ...",
+  "M",
+};
+
+std::ostream &operator<<(std::ostream &o, struct addrinfo *pai) {
+  if (pai->ai_family == AF_INET) {
+    struct sockaddr_in *psai = (struct sockaddr_in*)pai->ai_addr;
+    char ip[INET_ADDRSTRLEN];
+    if (inet_ntop(pai->ai_family, &(psai->sin_addr), ip, INET_ADDRSTRLEN) != NULL) {
+      return o << std::format("{:s}:{:d}", ip, ntohs(psai->sin_port));
+    } else {
+      return o << "[Unable to print IPv4 address: " << strerror(errno) << "]";
+    }
+  } else if (pai->ai_family == AF_INET6) {
+    struct sockaddr_in6 *psai = (struct sockaddr_in6*)pai->ai_addr;
+    char ip[INET6_ADDRSTRLEN];
+    if (inet_ntop(pai->ai_family, &(psai->sin6_addr), ip, INET6_ADDRSTRLEN) != NULL) {
+      return o << std::format("[{:s}]:{:d}", ip, ntohs(psai->sin6_port));
+    } else {
+      return o << "[Unable to print IPv6 address: " << strerror(errno) << "]";
+    }
+  } else {
+    return o << std::format("Don't know how to convert family {:d} addresses\n", pai->ai_family);
+  }
+}
 
 struct Server {
   std::string mame_host;
@@ -69,6 +152,12 @@ struct Server {
   int m_mame_socket = -1;
   std::map<std::string, std::string> m_template_values;
 
+  static constexpr int cs_connecting = 0;
+  static constexpr int cs_reconnecting = 1;
+  static constexpr int cs_connected = 2;
+
+  int m_connection_state = cs_connecting;
+  
   void lock() {
     mg_lock_context(m_mg_ctx);
   }
@@ -108,6 +197,12 @@ struct Server {
   void add_client(WSClient *client) {
     lock();
     m_ws_clients.insert(client);
+    unlock();
+  }
+
+  void client_ready(WSClient *client) {
+    lock();
+    client->send(connection_state_commands[m_connection_state]);
     unlock();
   }
 
@@ -160,21 +255,165 @@ struct Server {
     }
   }
 
-  template<typename T>
-  void show_message(T &message) {
-    std::stringstream os;
-    os << "DC 0 0";
-    for (const auto &c : message) {
-      os << std::format(" {:02x} 0", c - ' ');
+  void set_connection_state(int cs) {
+    if (cs != m_connection_state) {
+      m_connection_state = cs;
+      lock();
+      for (const auto &c: m_ws_clients) {
+        c->send(connection_state_commands[cs]);
+      }
+      unlock();
     }
-
-    lock();
-    for (const auto &c: m_ws_clients) {
-      c->show_message(os.str());
-    }
-    unlock();
   }
 
+  void talk_to_mame() {
+    std::cout << "Connecting to MAME ..." << std::endl;
+    set_connection_state(cs_connecting);
+    while (true) {
+      /* First we set up the connection to MAME */
+      int sfd;
+      struct addrinfo hints {0};
+      struct addrinfo *result, *rp;
+      hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
+      hints.ai_socktype = SOCK_STREAM; /* Stream socket */
+      hints.ai_flags = 0;
+      hints.ai_protocol = 0;           /* Any protocol */
+
+      int ar = getaddrinfo(mame_host.c_str(), mame_port.c_str(), &hints, &result);
+
+      struct pollfd pfd {0};
+
+      for (rp = result; rp != NULL; rp = rp->ai_next) {
+        sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (sfd == -1) {
+          std::cout << "Failed to create socket, trying next one" << std::endl;
+          continue;
+        }
+
+        // fcntl(sfd, F_SETFL, O_NONBLOCK);
+
+        std::cout << "Trying to connect to " << rp << " ...";
+
+        connect(sfd, rp->ai_addr, rp->ai_addrlen);
+
+        pfd.fd = sfd;
+        pfd.events = POLLOUT;
+
+        if (poll(&pfd, 1, 1000) == 1 && pfd.revents == POLLOUT) {
+          std::cout << " Connected!" << std::endl;
+          break;                  /* Success */
+        }
+
+        std::cout << " Connection failed." << std::endl;
+        close(sfd);
+      }
+
+      freeaddrinfo(result);           /* No longer needed */
+
+      if (rp == NULL) {               /* No address succeeded */
+        sleep(1);
+        continue;
+      }
+
+      // Connected!
+
+      set_connection_state(cs_connected);
+      send_to_all_clients("DX", 2); // clear the clients' screen(s)
+
+      pfd.fd = sfd;
+      pfd.events = POLLIN | POLLHUP;
+
+      MessageCollector<4096> collector;
+      char c;
+
+      int nfds;
+
+      // Request the system information
+      write(sfd, "\r\n\r\nI\r\n", 7);
+
+      // We are now ready to serve back and forth between MAME and our client(s).
+      set_mame_socket(sfd);
+
+      while (true) {
+        if (read_from_mame(sfd, c)) {
+          collector.handle(c);
+          if (collector.has_message() && collector.message_length() > 0) {
+            std::string_view message(collector.message_data(), collector.message_length());
+            char c = message[0];
+            if (c == 'I') {
+              handle_server_info(message);
+            }
+
+            send_to_all_clients(collector.message_data(), collector.message_length());
+            collector.clear_message();
+          }
+        } else {
+          printf("Failed to read from MAME!\r\n");
+          break;
+        }
+      }
+
+      reset_mame_socket();
+      close(sfd);
+
+      set_connection_state(cs_reconnecting);
+    }
+  }
+
+  bool keepalive(int sfd) {
+    int written = write(sfd, "\r\n", 2);
+    if (written != 2) {
+      printf("(!K)[keepalive write failed: %d -> %d]\r\n", written, errno);
+      fflush(stdout);
+      return false;
+    } else {
+      // printf("(K)");
+      fflush(stdout);
+      return true;
+    }
+  }
+
+  bool read_from_mame(int sfd, char &c) {
+    int nfds;
+
+    struct pollfd pfd {0};
+    pfd.fd = sfd;
+    pfd.events = POLLIN | POLLHUP;
+
+    while (true) {
+      // printf("p"); fflush(stdout);
+      if ((nfds = poll(&pfd, 1, 10000)) >= 0) {
+        // printf("%d", nfds); fflush(stdout);
+        if (nfds == 0) {
+          // timeout
+          if (!keepalive(sfd)) {
+            printf("!Keepalive!\r\n"); fflush(stdout);
+            return false;
+          }
+        } else if (pfd.revents & POLLERR) {
+          printf("Error\r\n"); fflush(stdout);
+          return false;
+        } else if (pfd.revents & POLLHUP) {
+          printf("Hangup\r\n"); fflush(stdout);
+          return false;
+        } else if (pfd.revents & POLLIN) {
+          // printf("(R)"); fflush(stdout);
+          int nread = read(sfd, &c, 1);
+          return nread == 1;
+        } else {
+          printf("Unexpected!\r\n"); fflush(stdout);
+          return false;
+        }
+      } else {
+        printf("Poll failed!\r\n"); fflush(stdout);
+        return false;
+      }
+    }
+  }
+
+  std::thread start_mame_thread() {
+    return std::thread(&Server::talk_to_mame, this);
+  }
 };
 
 /**
@@ -245,6 +484,9 @@ static void ws_ready_handler(struct mg_connection *conn, void *user_data) {
   WSClient *client = static_cast<WSClient *>(mg_get_user_connection_data(conn));
   client->m_connection = conn;
   client->m_ready = true;
+
+  server->client_ready(client);
+
   const struct mg_request_info *ri = mg_get_request_info(conn);
   (void)ri; /* in this example, we do not need the request_info */
 
@@ -326,237 +568,6 @@ static void ws_close_handler(const struct mg_connection *conn, void *user_data) 
   delete client;
 
   server->unlock();
-}
-
-void print_addrinfo(struct addrinfo *pai) {
-  if (pai->ai_family == AF_INET) {
-    struct sockaddr_in *psai = (struct sockaddr_in*)pai->ai_addr;
-    char ip[INET_ADDRSTRLEN];
-    if (inet_ntop(pai->ai_family, &(psai->sin_addr), ip, INET_ADDRSTRLEN) != NULL) {
-        printf("IPv4: %s:%d", ip, ntohs(psai->sin_port));
-    }
-  } else if (pai->ai_family == AF_INET6) {
-    struct sockaddr_in6 *psai = (struct sockaddr_in6*)pai->ai_addr;
-    char ip[INET6_ADDRSTRLEN];
-    if (inet_ntop(pai->ai_family, &(psai->sin6_addr), ip, INET6_ADDRSTRLEN) != NULL) {
-        printf("IPv6: %s:%d", ip, ntohs(psai->sin6_port));
-    }
-  } else {
-      printf("Don't know how to convert family %d addresses\n", pai->ai_family);
-  }
-}
-
-template<size_t size>
-struct MessageCollector {
-  std::array<char, size> m_buffer;
-  size_t m_received = 0;
-  size_t m_message_length = 0;
-  bool m_overflow = false;
-
-  void handle(char c) {
-    // printf("Received %02x, overflow=%d\r\n", c, m_overflow);
-    if (m_overflow) {
-      if (c == '\n') {
-        // printf("Found end of overflowing message, restarting.\r\n");
-        m_received = 0;
-        m_overflow = false;
-      } else {
-        // printf("In buffer overflow, ignoring.\r\n");
-      }
-    } else {
-      switch(c) {
-        case '\r': // ignore
-          // printf("ignoring CR\r\n");
-          break;
-
-        case '\n':
-          // printf("LF, have a message of %ld bytes\r\n", m_received);
-          m_message_length = m_received;
-          m_received = 0;
-          break;
-        
-        default:
-          if (m_received >= m_buffer.size()) {
-            // printf("Already have %ld of %ld characters - buffer overflow!\r\n", m_received, m_buffer.size());
-            m_overflow = true;
-            m_message_length = 0;
-            m_received = 0;
-          } else {
-            m_message_length = 0;
-            m_buffer[m_received++] = c;
-            // printf("accumulated character %02x, now have %ld (of max %ld)\r\n", c, m_received, m_buffer.size());
-          }
-      }
-    }
-  }
-
-  bool has_message() { return m_message_length > 0; }
-
-  std::string copy_message() {
-    std::stringstream os;
-    os.write(&m_buffer[0], m_message_length);
-    return os.str();
-  }
-
-  const char *message_data() { return (const char *)&m_buffer[0]; }
-  size_t message_length() { return m_message_length; }
-
-  void clear_message() {
-    m_message_length = m_received = 0;
-    m_overflow = false;
-  }
-};
-
-bool keepalive(int sfd) {
-  int written = write(sfd, "\r\n", 2);
-  if (written != 2) {
-    printf("(!K)[keepalive write failed: %d -> %d]\r\n", written, errno);
-    fflush(stdout);
-    return false;
-  } else {
-    // printf("(K)");
-    fflush(stdout);
-    return true;
-  }
-}
-
-bool read_from_mame(int sfd, char &c) {
-  int nfds;
-
-  struct pollfd pfd {0};
-  pfd.fd = sfd;
-  pfd.events = POLLIN | POLLHUP;
-
-  while (true) {
-    // printf("p"); fflush(stdout);
-    if ((nfds = poll(&pfd, 1, 10000)) >= 0) {
-      // printf("%d", nfds); fflush(stdout);
-      if (nfds == 0) {
-        // timeout
-        if (!keepalive(sfd)) {
-          printf("!Keepalive!\r\n"); fflush(stdout);
-          return false;
-        }
-      } else if (pfd.revents & POLLERR) {
-        printf("Error\r\n"); fflush(stdout);
-        return false;
-      } else if (pfd.revents & POLLHUP) {
-        printf("Hangup\r\n"); fflush(stdout);
-        return false;
-      } else if (pfd.revents & POLLIN) {
-        // printf("(R)"); fflush(stdout);
-        int nread = read(sfd, &c, 1);
-        return nread == 1;
-      } else {
-        printf("Unexpected!\r\n"); fflush(stdout);
-        return false;
-      }
-    } else {
-      printf("Poll failed!\r\n"); fflush(stdout);
-      return false;
-    }
-  }
-}
-
-void talk_to_mame(Server *server) {
-  bool first_connection = true;
-  while (true) {
-    printf("Connecting to MAME ...\r\n");
-
-    if (first_connection) 
-      server->show_message("Connecting to MAME ...");
-    else
-      server->show_message("Reconnecting to MAME ...");
-
-    /* First we set up the connection to MAME */
-
-    int sfd;
-    struct addrinfo hints {0};
-    struct addrinfo *result, *rp;
-    hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
-    hints.ai_socktype = SOCK_STREAM; /* Stream socket */
-    hints.ai_flags = 0;
-    hints.ai_protocol = 0;           /* Any protocol */
-
-    int ar = getaddrinfo(server->mame_host.c_str(), server->mame_port.c_str(), &hints, &result);
-
-    struct pollfd pfd {0};
-
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
-      sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-      if (sfd == -1) {
-        printf("Failed to create socket, trying next one\r\n");
-        continue;
-      }
-
-      // fcntl(sfd, F_SETFL, O_NONBLOCK);
-
-      printf("Trying to connect to ");
-      print_addrinfo(rp);
-      printf("\r\n");
-
-      connect(sfd, rp->ai_addr, rp->ai_addrlen);
-
-      pfd.fd = sfd;
-      pfd.events = POLLOUT;
-
-      if (poll(&pfd, 1, 1000) == 1 && pfd.revents == POLLOUT) {
-        printf("Connected!\r\n");
-        break;                  /* Success */
-      }
-
-      printf("Connection failed.\r\n");
-      close(sfd);
-    }
-
-    freeaddrinfo(result);           /* No longer needed */
-
-    if (rp == NULL) {               /* No address succeeded */
-      fprintf(stderr, "Could not connect.\n");
-      sleep(1);
-      continue;
-    }
-
-    // Connected!
-
-    first_connection = false;
-
-    pfd.fd = sfd;
-    pfd.events = POLLIN | POLLHUP;
-
-    MessageCollector<4096> collector;
-    char c;
-
-    int nfds;
-
-    // Request the system information
-    write(sfd, "\r\n\r\nI\r\n", 7);
-
-    // We are now ready to serve back and forth between MAME and our client(s).
-    server->set_mame_socket(sfd);
-
-    while (true) {
-      if (read_from_mame(sfd, c)) {
-        collector.handle(c);
-        if (collector.has_message() && collector.message_length() > 0) {
-          std::string_view message(collector.message_data(), collector.message_length());
-          char c = message[0];
-          if (c == 'I') {
-            server->handle_server_info(message);
-          }
-
-          server->send_to_all_clients(collector.message_data(), collector.message_length());
-          collector.clear_message();
-        }
-      } else {
-        printf("Failed to read from MAME!\r\n");
-        break;
-      }
-    }
-
-    server->reset_mame_socket();
-    close(sfd);
-  }
 }
 
 static int serve_html(struct mg_connection *conn, void *user_data) {
@@ -657,7 +668,7 @@ int main(int argc, char *argv[]) {
   server.set_template_value("version", "0");
 
   printf("Starting MAME connection thread\r\n");
-  std::thread mame_thread(talk_to_mame, &server);
+  std::thread mame_thread = server.start_mame_thread();
 
   /* Initialize CivetWeb library without OpenSSL/TLS support. */
   mg_init_library(0);
