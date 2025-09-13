@@ -459,7 +459,6 @@ var fp = (function() {
       labelText.setAttribute('stroke', 'none');
       labelText.setAttribute('font-size', fontSize);
       labelText.setAttribute('font-family', 'Helvetica');
-      labelText.setAttribute('font-style', 'italic');
       labelText.setAttribute('width', w);
       labelText.setAttribute('dominant-baseline', 'bottom');
       var x0 = 0;
@@ -470,9 +469,13 @@ var fp = (function() {
         x0 = w/2;
         // fall through
       case my.LabelPosition.ABOVE:
+        // Labels above buttons are always italic, below are not.
+        labelText.setAttribute('font-style', 'italic');
         y0 = (1 - labelLines.length) * fontSize - 0.3;
         break;
-      case my.LabelPosition.BELOW:
+      case my.LabelPosition.BELOW: // Always centered when below
+        labelText.setAttribute('text-anchor', 'middle');
+        x0 = w/2;
         y0 = h + fontSize - 0.3;
         break;
       }
