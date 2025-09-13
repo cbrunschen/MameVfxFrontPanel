@@ -3,7 +3,13 @@
 from textwrap import indent, dedent, wrap
 from dataclasses import dataclass, field
 import re
-import sys
+
+@dataclass
+class Document:
+  root: 'Element'
+
+  def __str__(self):
+    return f'<?xml version="1.0"?>\n{self.root}'
 
 @dataclass
 class Element:
@@ -115,14 +121,22 @@ class Rect:
   
   def toBounds(self):
     return Element('bounds', {
-      'x': f"{self.x:.3g}", 
-      'y': f"{self.y:.3g}", 
-      'width': f"{self.w:.3g}", 
-      'height':f"{self.h:.3g}"
+      'x': f"{self.x:.5g}", 
+      'y': f"{self.y:.5g}", 
+      'width': f"{self.w:.5g}", 
+      'height':f"{self.h:.5g}"
       }, [])
-  
-displayRect = Rect(15, 7, 82, 13)
 
+  def fitWithin(self, enclosing):
+    xscale = enclosing.w / self.w
+    yscale = enclosing.h / self.h
+    scale = min(xscale, yscale)
+
+    dx = (enclosing.w - (self.w * scale)) / 2
+    dy = (enclosing.h - (self.h * scale)) / 2
+
+    return Rect(enclosing.x + dx, enclosing.y + dy, self.w * scale, self.h * scale)
+  
 class Slider:
   def __init__(self, x, y, w, h, channel, value):
     self.channel = channel
@@ -166,6 +180,11 @@ SHADE_DARK = ('dark', "#333333", '#ffffff')
 
 fontSize = 1.4
 
+roughDisplayRect = Rect(15, 7, 82, 13)
+charRect = Rect(0, 0, 342, 572)
+charsRect = Rect(0, 0, 40 * charRect.w, 2 * charRect.h)
+displayRect = charsRect.fitWithin(roughDisplayRect)
+
 
 def rgb_components(rgb):
   return [int(c, 16) / 255.0 for c in wrap(rgb.removeprefix('#'), 2)]
@@ -186,7 +205,7 @@ class ConditionalLabel:
 
 class Panel:
   def __init__(self):
-    self.rect = displayRect
+    self.rect = roughDisplayRect
 
     self.button_shapes = {}
     self.text_definitions = {}
@@ -207,12 +226,94 @@ class Panel:
         ]),
       ])
     ]
-    self.slider_definitions = []
+    self.slider_definitions = [
+      # Initially just an empty grey rectangle
+      Element('element', {
+        'name': 'slider'
+      }, [
+        Element('rect', {}, [
+          self.layout_color("#333333")
+        ])
+      ])
+    ]
+    self.vfd_definitions = [
+      dedent('''\
+  <!-- The VFD elements -->
+  <element name="segments" defstate="0">
+    <led14seg>
+      <color red="0.45" green="1.0" blue="0.95" />
+    </led14seg>
+  </element>
+
+  <element name="dot" defstate="0">
+    <disk statemask="0x4000" state="0"><color red="0.06" green="0.12" blue="0.10" /></disk>
+    <disk statemask="0x4000" state="0x4000"><color red="0.45" green="1.00" blue="0.95" /></disk>
+  </element>
+
+  <element name="underline" defstate="0">
+    <rect statemask="0x8000" state="0"><color red="0.06" green="0.12" blue="0.10" /></rect>
+    <rect statemask="0x8000" state="0x8000"><color red="0.45" green="1.00" blue="0.95" /></rect>
+  </element>
+
+  <group name="vfd_cell">
+    <bounds x="0" y="0" width="342" height="572" />
+    <element ref="segments" name="~input~"><bounds x="50" y="69" width="214" height="311" /></element>
+    <element ref="dot" name="~input~"><bounds x="253" y="337" width="42" height="42" /></element>
+    <element ref="underline" name="~input~"><bounds x="43" y="441" width="183" height="25" /></element>
+  </group>
+
+  <element name="vfd_background">
+    <rect>
+      <color red="0.0" green="0.0" blue="0.0" />
+    </rect>
+  </element>
+
+  <group name="vfd">
+    <element ref="vfd_background">
+      <bounds x="0" y="0" width="13680" height="1144" />
+    </element>
+
+    <!-- VFDs -->
+    <repeat count="2">
+      <param name="s" start="0" increment="40" />
+      <param name="y" start="0" increment="572" />
+      <repeat count="40">
+        <param name="n" start="~s~" increment="1" />
+        <param name="x" start="0" increment="342" />
+
+        <param name="input" value="vfd~n~" />
+        <group ref="vfd_cell">
+          <bounds x="~x~" y="~y~" width="342" height="572" />
+        </group>
+
+      </repeat>
+    </repeat>
+  </group>
+''')
+    ]
+
+    self.decoration_definitions = [
+      Element('element', {
+        'name': 'background'
+      }, [
+        Element('rect', {}, [
+          self.layout_color("#000000")
+        ])
+      ])
+    ]
 
     self.button_uses = []
     self.text_uses = []
     self.light_uses = []
     self.slider_uses = []
+    self.decoration_uses = []
+    self.vfd_uses = [
+      dedent(f'''\
+    <group ref="vfd">
+      {displayRect.toBounds()}
+    </group>
+''')
+    ]
 
     self.view = []
   
@@ -478,7 +579,7 @@ class Panel:
     self.addSmallButton(137,  6, "Storage",       21, SHADE_LIGHT, False, condition=hasSeq)
     self.addSmallButton(143,  6, "MIDI\nControl", 24, SHADE_LIGHT, True, condition=hasSeq)
 
-    # When there is no Seuencer:
+    # When there is no Sequencer:
     # The 'Master', 'Storage' and 'MIDI Control' buttons are large & at the bottom,
     # and there are no sequencer buttons
     self.addLargeButton(131, 29, "Master",        20, SHADE_LIGHT, True, condition=noSeq)
@@ -523,41 +624,49 @@ class Panel:
 
     self.rect = self.rect.outset(2, 2)
 
+    self.decoration_uses.append(
+      self.layout_element(ref='background', bounds=self.rect)
+    )
+
   def __str__(self):
-    sections = Element('Foo', {}, [])
-    sections.append(Comment('Button shapes'))
-    sections.extend([shape for (k, shape) in self.button_shapes.items()])
+    layout = Element('mamelayout', {'version':'2'})
+    
+    layout.append(Comment('VFD'))
+    layout.extend(self.vfd_definitions)
 
-    sections.append(Space())
-    sections.append(Comment('Text items'))
-    sections.extend([d for (k, d) in self.text_definitions.items()])
+    layout.append(Comment('Button shapes'))
+    layout.extend([shape for (k, shape) in self.button_shapes.items()])
 
-    sections.append(Space())
-    sections.append(Comment('Light items'))
-    sections.extend(self.light_definitions)
+    layout.append(Space())
+    layout.append(Comment('Text items'))
+    layout.extend([d for (k, d) in self.text_definitions.items()])
 
-    sections.append(Space())
-    sections.append(Comment('Slider definitions'))
-    sections.extend(self.slider_definitions)
+    layout.append(Space())
+    layout.append(Comment('Light items'))
+    layout.extend(self.light_definitions)
 
-    sections.append(Space())
-    sections.append(Comment('Now use these!'))
+    layout.append(Space())
+    layout.append(Comment('Slider definitions'))
+    layout.extend(self.slider_definitions)
+
+    layout.append(Space())
+    layout.append(Comment('Decoration definitions'))
+
+    layout.append(Space())
+    layout.append(Comment('Panel View'))
 
     group = Element('group', {'name':"Panel"}, [])
-    sections.append(group)
+    layout.append(group)
+    group.extend(self.vfd_uses)
+    group.extend(self.text_uses)
     group.extend(self.button_uses)
     group.extend(self.light_uses)
-    group.extend(self.text_uses)
     group.extend(self.slider_uses)
-
-    # return str(sections)
+    group.extend(self.decoration_uses)
     
-    return str(sections)
+    document = Document(layout)
 
-    # print(f"sections: {sections}")
-    # sio = StringIO
-    # ElementTree(sections).write(sio, encoding='unicode')
-    # return sio.getvalue()
+    return str(document)
 
 p = Panel()
 p.addControls()
