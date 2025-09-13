@@ -563,6 +563,3 @@ p = Panel()
 p.addControls()
 
 print(p)
-
-print(CDATA('Something ]]> here ]]> etc'))
-print(Comment('Something -- here --- etc'))
