@@ -1,8 +1,66 @@
 #!/usr/bin/env python3
 
 from textwrap import indent, dedent, wrap
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
+import sys
+
+@dataclass
+class Element:
+  tag: str
+  attrs: dict[str, str] = field(default_factory=dict)
+  children: list[any] = field(default_factory=list)
+
+  def append(self, i):
+    if (i == self):
+      raise Exception(f"{self.tag}: Appending self")
+    self.children.append(i)
+  
+  def extend(self, l):
+    for i in l:
+      self.append(i)
+
+  def __str__(self):
+    items = [ f'<{self.tag}' ]
+    if self.attrs is not None:
+      items.extend([f' {k}="{v}"' for (k,v) in self.attrs.items() if v is not None])
+
+    if self.children is not None and len(self.children) > 0:
+      items.append('>\n')
+      items.extend([indent(str(child), '  ') for child in self.children])
+      items.append(f'</{self.tag}>\n')
+
+    else:
+      items.append(' />\n')
+    
+    return ''.join(items)
+
+@dataclass
+class CDATA:
+  contents: str
+
+  def __str__(self):
+    parts = self.contents.split(']]>')
+    escaped = ']]>]]><[CDATA['.join(parts)
+    return f'<[CDATA[\n{indent(escaped, '  ')}\n]]>'
+
+@dataclass
+class Space:
+  n: int = 1
+
+  def __str__(self):
+    return '\n'.join(['' for i in range(self.n + 1)])
+
+
+@dataclass
+class Comment:
+  contents: str
+
+  def __str__(self):
+    return f'<-- {self.contents.replace("--", "==")} -->\n'
+
+def clean(d: dict[str, str]) -> dict[str, str]:
+  return { k : v for (k, v) in d.items() if v != None }
 
 class Rect:
   def __init__(self, x, y, w, h):
@@ -36,11 +94,15 @@ class Rect:
     return Rect(self.x+dx, self.y+dy, self.w, self.h)
   
   def toPath(self, r=None):
-    rs = f' rx="{r:.3g}"' if r != None else ''
-    return f'<rect x="{self.x:.3g}" y={self.y:.3g} width={self.w:.3g} height={self.h:.3g}{rs}" />'
+    rx = f"{r:.3g}" if r != None else None
+    return Element('rect', clean({
+      'x': f"{self.x:.3g}", 
+      'y': f"{self.y:.3g}", 
+      'width': f"{self.w:.3g}", 
+      'height': f"{self.h:.3g}", 
+      'rx': rx
+    }), [])
 
-  def toSvg(self, r=None):
-    return f'<svg>{self.toPath(r)}</svg>'
   
   def getX(self, d):
     return self.x + d * self.w
@@ -52,7 +114,12 @@ class Rect:
     return f"{self.x} {self.y} {self.w} {self.h}"
   
   def toBounds(self):
-    return f'<bounds x="{self.x:.3g}" y="{self.y:.3g}" width="{self.w:.3g}" height="{self.h:.3g}" />'
+    return Element('bounds', {
+      'x': f"{self.x:.3g}", 
+      'y': f"{self.y:.3g}", 
+      'width': f"{self.w:.3g}", 
+      'height':f"{self.h:.3g}"
+      }, [])
   
 displayRect = Rect(15, 7, 82, 13)
 
@@ -103,11 +170,6 @@ fontSize = 1.4
 def rgb_components(rgb):
   return [int(c, 16) / 255.0 for c in wrap(rgb.removeprefix('#'), 2)]
 
-def opt(n, v):
-  if v != None:
-    return f' {n}="{v}"'
-  return ''
-
 @dataclass
 class Condition:
   name: str
@@ -117,6 +179,11 @@ class Condition:
   def opposite(self):
     return Condition(self.name, self.mask, not self.state)
 
+@dataclass
+class ConditionalLabel:
+  label: str
+  condition: Condition
+
 class Panel:
   def __init__(self):
     self.rect = displayRect
@@ -124,12 +191,21 @@ class Panel:
     self.button_shapes = {}
     self.text_definitions = {}
     self.light_definitions = [
-      dedent(f'''\
-        <element name="light">
-          <rect state="0" statemask="~lightmask~">{self.layout_color("#112211")}</rect>
-          <rect state="~lightmask~" statemask="~lightmask~">{self.layout_color("#22ff22")}</rect>
-        </element>
-      ''')
+      Element('element', {}, [
+        Element('rect', {
+          'state': '0',
+          'statemask': '~lightmask~',
+        }, [
+          self.layout_color("#112211")
+        ]),
+
+        Element('rect', {
+          'state': '~lightmask~',
+          'statemask': '~lightmask~',
+        }, [
+          self.layout_color("#22ff22")        
+        ]),
+      ])
     ]
     self.slider_definitions = []
 
@@ -145,26 +221,35 @@ class Panel:
 
   def layout_color(self, rgb):
     comps = rgb_components(rgb)
-    return f'<color red="{comps[0]:.3g}" green="{comps[1]:.3g}" blue="{comps[2]:.3g}" />'
+    return Element('color', {
+      'red': f"{comps[0]:.3g}", 
+      'green': f"{comps[1]:.3g}", 
+      'blue': f"{comps[2]:.3g}"},
+      []
+    )
   
-  def layout_tag(self, tag, contents=None, bounds=None, color=None, name=None, ref=None):
-    children = []
+  def layout_tag(self, tag, contents=None, bounds=None, color=None, name=None, ref=None, **kwargs):
+    e = Element(tag, clean({
+      **kwargs,
+      'name': name,
+      'ref': ref
+    }), [])
+
     if (bounds != None):
-      children.append(self.layout_bounds(bounds))
+      e.append(self.layout_bounds(bounds))
+
     if (color != None):
-      children.append(self.layout_color(color))
+      e.append(self.layout_color(color))
+
     if (contents != None):
-      children.append(contents)    
-    c = ''.join(children)
-    return f'''\
-<{tag}\
-{opt('ref', ref)}\
-{opt('name', name)}\
->
-{c}
-</{tag}>
-      '''
-  
+      if isinstance(contents, list):
+        for i in contents:
+          e.append(i)
+      else:
+        e.append(contents)    
+    return e
+
+
   def layout_element(self, **kwargs):
     return self.layout_tag('element', **kwargs)
 
@@ -172,32 +257,37 @@ class Panel:
     return self.layout_tag('group', **kwargs)
 
   def layout_rect(self, name=None, color=None, state=None, statemask=None):
-    return f'''\
-<rect\
-{opt('name', name)}\
-{opt('state', state)}\
-{opt('statemask', statemask)}\
-{self.layout_color(color) if color != None else ""}\
-</rect>"'''
+    e = Element('rect', clean({
+      'name': name,
+      'state': state,
+      'statemask': statemask
+    }), [])
+    if (color != None):
+      e.append(self.layout_color(color))
+    return e
   
-  def layout_svg(self, svg, name=None, color=None, state=None, statemask=None):
-    optcolor = ('  ' + self.layout_color(color)) if color != None else ''
-    return f'''\
-<image\
-{opt('name', name)}\
-{opt('state', state)}\
-{opt('statemask', statemask)}\
->{optcolor}<data><![CDATA[{svg}]]></data></image>'''
+  def layout_svg_image(self, svg, name=None, color=None, state=None, statemask=None):
+    e = Element('image', clean({
+      'name': name,
+      'state': state,
+      'statemask': statemask
+    }), [])
+    if color != None:
+      e.append(self.layout_color(color))
+    e.append(CDATA(svg))
+    return e
 
   def layout_text(self, s, name=None, color=None, state=None, statemask=None, align=None):
-    close = f'>{self.layout_color(color)}</text>' if color != None else ' />'
-    return f'''\
-<text string="{s}"\
-{opt('name', name)}\
-{opt('state', state)}\
-{opt('statemask', statemask)}\
-{opt('align', align)}\
-{close}'''
+    e = Element('text', clean({
+      'string': s,
+      'name': name,
+      'state': state,
+      'statemask': statemask,
+      'align': align
+    }), [])
+    if color != None:
+      e.append(self.layoutColor(color))
+    return e
 
   def addButton(self, x, y, w, h, label, labelPosition, value, shade, multiPage = False, lightId = None, condition = None):
     bounds = Rect(x, y, w, h)
@@ -208,11 +298,11 @@ class Panel:
     shape_name = f'button_{w}_{h}_{shade_name}'
     if shape_name not in self.button_shapes:
       rect = Rect(0, 0, w, h).inset(0.1, 0.1)
-      svg = f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{rect.toPath()}</svg>'
-      definition = self.layout_element(contents='\n'.join([
-        self.layout_svg(svg, state="0", color=rgb_default),
-        self.layout_svg(svg, state="1", color=rgb_pressed)
-      ]), name=shape_name)
+      svg = f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{str(rect.toPath()).rstrip()}</svg>'
+      definition = self.layout_element(contents=[
+        self.layout_svg_image(svg, state="0", color=rgb_default),
+        self.layout_svg_image(svg, state="1", color=rgb_pressed)
+      ], name=shape_name)
       self.button_shapes[shape_name] = definition
     
     inputtag = "buttons_0" if value < 32 else "buttons_32"
@@ -220,30 +310,22 @@ class Panel:
     inputmask = f'0x{mask:08x}'
 
     if condition != None:
-      self.button_uses.append(f'''\
-<element ref="{shape_name}" \
-inputtag="{inputtag}" \
-inputmask="{inputmask}" \
-name="{condition.name}" \
-statemask="{condition.mask}" \
-state="{condition.mask if condition.state else 0}" \
-{self.layout_bounds(bounds)}\
-</element>
-''')
+      self.button_uses.append(
+        self.layout_element(
+          bounds=bounds,
+          inputtag=inputtag, inputmask=inputmask,
+          name=condition.name, statemask=condition.mask, state=condition.mask if condition.state else 0
+        )
+      )
     else:
-      self.button_uses.append(f'''\
-<element ref="{shape_name}" \
-inputtag="{inputtag}" \
-inputmask="{inputmask}">\
-{self.layout_bounds(bounds)}\
-</element>
-''')
+      self.button_uses.append(
+        self.layout_element(
+          bounds=bounds,
+          inputtag=inputtag, inputmask=inputmask
+        )
+      )
 
-    if label.startswith("#"):
-      id = re.sub(r'[^a-zA-Z0-9]+', '_', label.replace('-\n',''))
-      label = None
-
-    if label != None:
+    def placeLabel(label, condition=None):
       labelLines = label.split("\n")
       nLines = len(labelLines)
       y0 = (1 - nLines) * fontSize
@@ -256,6 +338,8 @@ inputmask="{inputmask}">\
       for i in range(nLines):
         line = labelLines[i]
         id = re.sub(r'[^a-zA-Z0-9]+', '_', line).casefold()
+        if align is not None:
+          id = f'{id}__leftaligned'
 
         textBounds = Rect(x, y + y0 + i * fontSize, w, fontSize)
         if id not in self.text_definitions:
@@ -269,23 +353,36 @@ inputmask="{inputmask}">\
         self.text_uses.append(
           self.layout_element(
             ref=f'text_{id}',
-            bounds=textBounds
+            bounds=textBounds,
+            name=condition.name if condition else None, 
+            statemask=condition.mask if condition else None, 
+            state=(condition.mask if condition.state else 0) if condition else None
             ))
+
+    if isinstance(label, list) and len(label) > 0 and isinstance(label[0], ConditionalLabel):
+      for cl in label:
+        placeLabel(cl.label, cl.condition)
+      label = None
+
+    elif label.startswith("#"):
+      id = re.sub(r'[^a-zA-Z0-9]+', '_', label.replace('-\n',''))
+      label = None
+
+    if label != None:
+      placeLabel(label)
 
     if lightId >= 0:
       self.light_uses.extend([
-        f'<param name="lightmask" value="{1 << lightId:04x}" />',
-        self.layout_element(ref=f'light')
+        Element('param', {'name':'lightmask', 'value':f"{1 << lightId:04x}"}),
+        self.layout_element(ref=f'light', bounds=Rect(x + w/3, y + h/25, w/h, h/3))
       ])  
 
   def addSlider(self, x, y, w, h, channel, value):
     bounds = Rect(x, y, w, h)
     self.rect = self.rect.union(bounds)
     self.slider_uses.extend([
-      dedent(f'''\
-        <param name="slider_id" value="slider_{channel}" />
-        <param name="port_name" value="analog_{channel}" />
-      '''),
+      Element('param', {'name':'slider_id', 'value':f"slider_{channel}"}, []),
+      Element('param', {'name':'port_name', 'value':f"analog_{channel}"}, []),
       self.layout_group(ref="slider", bounds=bounds)
     ])
 
@@ -316,9 +413,10 @@ inputmask="{inputmask}">\
     hasBankSet = Condition('variant', "0x2", True);
     noBankSet = hasBankSet.opposite();
 
-    # Show either the 'BankSet' or 'Cart' button. Same functionality, just different labels.
-    self.addButtonWithLightBelowDisplay(10, 29, "BankSet", 52, SHADE_LIGHT, 0xf, condition=hasBankSet)
-    self.addButtonWithLightBelowDisplay(10, 29, "Cart", 52, SHADE_LIGHT, 0xf, condition=noBankSet)
+    self.addButtonWithLightBelowDisplay(10, 29, [
+      ConditionalLabel("BankSet", hasBankSet),
+      ConditionalLabel("Cart", noBankSet),
+    ], 52, SHADE_LIGHT, 0xf, condition=hasBankSet)
 
     self.addButtonWithLightBelowDisplay(16, 29, "Sounds",   53, SHADE_LIGHT, 0xd)
     self.addButtonWithLightBelowDisplay(22, 29, "Presets",  54, SHADE_LIGHT, 0x7)
@@ -426,30 +524,45 @@ inputmask="{inputmask}">\
     self.rect = self.rect.outset(2, 2)
 
   def __str__(self):
-    sections = []
-    sections.append('<!-- Button shapes -->')
+    sections = Element('Foo', {}, [])
+    sections.append(Comment('Button shapes'))
     sections.extend([shape for (k, shape) in self.button_shapes.items()])
 
-    sections.append('<!-- Text items -->')
+    sections.append(Space())
+    sections.append(Comment('Text items'))
     sections.extend([d for (k, d) in self.text_definitions.items()])
 
-    sections.append('<!-- Light items -->')
+    sections.append(Space())
+    sections.append(Comment('Light items'))
     sections.extend(self.light_definitions)
 
-    sections.append('<!-- Slider definitions -->')
+    sections.append(Space())
+    sections.append(Comment('Slider definitions'))
     sections.extend(self.slider_definitions)
 
-    sections.append('<!-- Now use these! -->')
-    sections.append('<group name="full">')
-    sections.extend([indent(i, '  ') for i in self.button_uses])
-    sections.extend([indent(i, '  ') for i in self.light_uses])
-    sections.extend([indent(i, '  ') for i in self.text_uses])
-    sections.extend([indent(i, '  ') for i in self.slider_uses])
-    sections.append('</group>')
+    sections.append(Space())
+    sections.append(Comment('Now use these!'))
 
-    return '\n'.join(sections)
+    group = Element('group', {'name':"Panel"}, [])
+    sections.append(group)
+    group.extend(self.button_uses)
+    group.extend(self.light_uses)
+    group.extend(self.text_uses)
+    group.extend(self.slider_uses)
+
+    # return str(sections)
+    
+    return str(sections)
+
+    # print(f"sections: {sections}")
+    # sio = StringIO
+    # ElementTree(sections).write(sio, encoding='unicode')
+    # return sio.getvalue()
 
 p = Panel()
 p.addControls()
 
 print(p)
+
+print(CDATA('Something ]]> here ]]> etc'))
+print(Comment('Something -- here --- etc'))
