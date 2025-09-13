@@ -169,7 +169,7 @@ struct Server {
   void send_to_all_clients(const char *data, size_t len, struct mg_connection *except = nullptr) {
     lock();
     for (const auto &c: m_ws_clients) {
-      c->send(data, len);
+      if (c->m_connection != except) c->send(data, len);
     }
     unlock();
   }
@@ -348,7 +348,7 @@ struct Server {
             collector.clear_message();
           }
         } else {
-          printf("Failed to read from MAME!\r\n");
+          std::cerr << std::format("Failed to read from MAME!") << std::endl;
           break;
         }
       }
@@ -363,7 +363,7 @@ struct Server {
   bool keepalive(int sfd) {
     int written = write(sfd, "\r\n", 2);
     if (written != 2) {
-      printf("(!K)[keepalive write failed: %d -> %d]\r\n", written, errno);
+      std::cerr << std::format("Keepalive write failed: {}", strerror(errno)) << std::endl;
       fflush(stdout);
       return false;
     } else {
@@ -387,25 +387,23 @@ struct Server {
         if (nfds == 0) {
           // timeout
           if (!keepalive(sfd)) {
-            printf("!Keepalive!\r\n"); fflush(stdout);
             return false;
           }
         } else if (pfd.revents & POLLERR) {
-          printf("Error\r\n"); fflush(stdout);
+          std::cerr << "Error polling MAME" << std::endl;
           return false;
         } else if (pfd.revents & POLLHUP) {
-          printf("Hangup\r\n"); fflush(stdout);
+          std::cerr << "Hangup polling MAME" << std::endl;
           return false;
         } else if (pfd.revents & POLLIN) {
-          // printf("(R)"); fflush(stdout);
           int nread = read(sfd, &c, 1);
           return nread == 1;
         } else {
-          printf("Unexpected!\r\n"); fflush(stdout);
+          std::cerr << "Unexpected result polling MAME" << std::endl;
           return false;
         }
       } else {
-        printf("Poll failed!\r\n"); fflush(stdout);
+        std::cerr << "Failed to poll MAME" << std::endl;
         return false;
       }
     }
@@ -438,7 +436,7 @@ void write_template(std::ostream &dst, std::istream &src, substitution substitut
         dst << s;
       }
     } else {
-      // printf("webserver: reached end before initiator\n");
+      // printf("template: reached end before initiator\n");
     }
   }
 }
@@ -560,7 +558,7 @@ static void ws_close_handler(const struct mg_connection *conn, void *user_data) 
   client->m_connection = nullptr;
 
   /* DEBUG: Client has left. */
-  printf("Client %u closing connection\n", client->m_connection_number);
+  // printf("Client %u closing connection\n", client->m_connection_number);
 
   server->remove_client(client);
 
@@ -595,7 +593,7 @@ static int serve_js(struct mg_connection *conn, void *user_data) {
 
 int main(int argc, char *argv[]) {
   if (pipe(pipefds)) {
-    fprintf(stderr, "Cannot create pipe: %d\n", errno);
+    std::cerr << std::format("Cannot create pipe: {}", strerror(errno)) << std::endl;
     exit(1);
   }
 
@@ -667,7 +665,7 @@ int main(int argc, char *argv[]) {
   server.set_template_value("keyboard", "vfx");
   server.set_template_value("version", "0");
 
-  printf("Starting MAME connection thread\r\n");
+  // std::cout << "Starting MAME connection thread" << std::endl;
   std::thread mame_thread = server.start_mame_thread();
 
   /* Initialize CivetWeb library without OpenSSL/TLS support. */
@@ -690,7 +688,7 @@ int main(int argc, char *argv[]) {
   struct mg_context *ctx =
       mg_start2(&mg_start_init_data, &mg_start_error_data);
   if (!ctx) {
-    fprintf(stderr, "Cannot start server: %s\n", errtxtbuf);
+    std::cerr << std::format("Cannot start server: {}\n", errtxtbuf) << std::endl;
     mg_exit_library();
     return 1;
   }
@@ -710,7 +708,7 @@ int main(int argc, char *argv[]) {
   mg_set_request_handler(ctx, "/FrontPanel.js", serve_js, &server);
 
   /* Let the server run. */
-  printf("Websocket server running\n");
+  // std::cout << "Websocket server running" << std::endl;
 
   struct pollfd pfd;
   pfd.fd = pipefds[0];
@@ -719,10 +717,9 @@ int main(int argc, char *argv[]) {
     pfd.fd = pipefds[0];
     pfd.events = POLLIN;
   }
-  printf("Websocket server stopping\n");
+  // std::cout << "Websocket server stopping" << std::endl;
 
-  /* Stop server, disconnect all clients. Then deinitialize CivetWeb library.
-   */
+  /* Stop server, disconnect all clients. Then deinitialize CivetWeb library. */
   mg_stop(ctx);
   mg_exit_library();
 }
