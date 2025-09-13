@@ -330,941 +330,944 @@ var fp = (function() {
         if (cell.blink) {
           this.showSegments(cell.segments,
             my.Display.segmentsForCharacter(cell.char, cell.underline, cell.blink, this.blinkPhase));
-          }
         }
       }
     }
+  }
 
-    my.Rect = function(x, y, w, h) {
-      this.x = x;
-      this.y = y;
-      this.w = w;
-      this.h = h;
+  my.Rect = function(x, y, w, h) {
+    this.x = x;
+    this.y = y;
+    this.w = w;
+    this.h = h;
+  }
+
+  my.Rect.from = function(e) {
+    let x = parseFloat(e.getAttribute('x'));
+    let y = parseFloat(e.getAttribute('y'));
+    let w = parseFloat(e.getAttribute('width'));
+    let h = parseFloat(e.getAttribute('height'));
+    return new my.Rect(x, y, w, h);
+  }
+
+  my.Rect.fromViewBox = function(e) {
+    let parts = e.getAttribute('viewBox').split(' ');
+    let x = parseFloat(parts[0]);
+    let y = parseFloat(parts[1]);
+    let w = parseFloat(parts[2]);
+    let h = parseFloat(parts[3]);
+    return new my.Rect(x, y, w, h);
+  }
+
+  my.Rect.prototype.toString = function() {
+    return `my.Rect(${this.x}, ${this.y}, ${this.w}, ${this.h})`;
+  }
+
+  my.Rect.prototype.union = function(other) {
+    if (this.w == 0 || this.h == 0) {
+      return other;
+    } else if (other.w == 0 || other.h == 0) {
+      return this;
+    } else {
+      minX = Math.min(this.x, other.x);
+      maxX = Math.max(this.x+this.w, other.x+other.w);
+      minY = Math.min(this.y, other.y);
+      maxY = Math.max(this.y+this.h, other.y+other.h);
+      return new my.Rect(minX, minY, maxX-minX, maxY-minY);
     }
+  }
 
-    my.Rect.from = function(e) {
-      let x = parseFloat(e.getAttribute('x'));
-      let y = parseFloat(e.getAttribute('y'));
-      let w = parseFloat(e.getAttribute('width'));
-      let h = parseFloat(e.getAttribute('height'));
-      return new my.Rect(x, y, w, h);
+  my.Rect.prototype.inset = function(dx, dy) {
+    return new my.Rect(this.x + dx, this.y + dy, this.w - 2*dx, this.h - 2*dy);
+  }
+
+  my.Rect.prototype.outset = function(dx, dy) {
+    return new my.Rect(this.x - dx, this.y - dy, this.w + 2*dx, this.h + 2*dy);
+  }
+
+  my.Rect.prototype.offset = function(dx, dy) {
+    return new my.Rect(this.x+dx, this.y+dy, this.w, this.h);
+  }
+
+  my.Rect.prototype.toPath = function(r) {
+    var rect = my.createElement("rect");
+    rect.setAttribute("x", this.x);
+    rect.setAttribute("y", this.y);
+    rect.setAttribute("width", this.w);
+    rect.setAttribute("height", this.h);
+    if (r != null) {
+      rect.setAttribute("rx", r);
+      rect.setAttribute("ry", r);
     }
+    return rect;
+  }
 
-    my.Rect.fromViewBox = function(e) {
-      let parts = e.getAttribute('viewBox').split(' ');
-      let x = parseFloat(parts[0]);
-      let y = parseFloat(parts[1]);
-      let w = parseFloat(parts[2]);
-      let h = parseFloat(parts[3]);
-      return new my.Rect(x, y, w, h);
-    }
+  my.Rect.prototype.getX = function(d) {
+    return this.x + d * this.w;
+  }
 
-    my.Rect.prototype.toString = function() {
-      return `my.Rect(${this.x}, ${this.y}, ${this.w}, ${this.h})`;
-    }
+  my.Rect.prototype.getY = function(d) {
+    return this.y + d * this.h;
+  }
 
-    my.Rect.prototype.union = function(other) {
-      if (this.w == 0 || this.h == 0) {
-        return other;
-      } else if (other.w == 0 || other.h == 0) {
-        return this;
-      } else {
-        minX = Math.min(this.x, other.x);
-        maxX = Math.max(this.x+this.w, other.x+other.w);
-        minY = Math.min(this.y, other.y);
-        maxY = Math.max(this.y+this.h, other.y+other.h);
-        return new my.Rect(minX, minY, maxX-minX, maxY-minY);
+  my.Rect.prototype.viewBox = function() {
+    return `${this.x} ${this.y} ${this.w} ${this.h}`
+  }
+
+  my.Rect.prototype.applyTo = function(e) {
+    e.setAttribute('x', `${this.x}`);
+    e.setAttribute('y', `${this.y}`);
+    e.setAttribute('width', `${this.w}`);
+    e.setAttribute('height', `${this.h}`);
+  }
+
+  my.displayRect = new my.Rect(15, 7, 82, 13);
+
+  my.Button = function(x, y, w, h, label, labelPosition, value, color, multiPage, lightId) {
+    var that = this;
+    this.rect = new my.Rect(x, y, w, h);
+
+    var rect = this.rect.inset(0.1, 0.1);
+    var translation = "translate(" + x + "," + y + ")";
+    this.halo = rect.toPath(0.5);
+    this.halo.setAttribute("stroke", "#666666");
+    this.halo.setAttribute("stroke-width", "2");
+    this.halo.setAttribute("fill", "none");
+    my.hideElement(this.halo);
+
+    rect = rect.offset(-x, -y);
+    this.outline = rect.toPath(0.5);
+    this.outline.setAttribute("fill", color);
+    this.outline.setAttribute("stroke", "none");
+
+    this.group = my.createElement("g");
+    this.group.setAttribute("transform", translation);
+    this.group.appendChild(this.outline);
+
+    this.label = label;
+    this.labelPosition = labelPosition;
+    this.value = value;
+    this.color = color;
+    this.multiPage = multiPage;
+    this.lightId = lightId;
+
+    if (label != undefined) {
+      var labelLines = label.split("\n");
+      var fontSize = 1.4;
+      var labelText = my.createElement("text");
+      labelText.setAttribute('fill', 'white');
+      labelText.setAttribute('stroke', 'none');
+      labelText.setAttribute('font-size', fontSize);
+      labelText.setAttribute('font-family', 'Helvetica');
+      labelText.setAttribute('font-style', 'italic');
+      labelText.setAttribute('width', w);
+      labelText.setAttribute('dominant-baseline', 'bottom');
+      var x0 = 0;
+      var y0 = (1 - labelLines.length) * fontSize;
+      switch(labelPosition) {
+      case my.LabelPosition.ABOVE_CENTERED:
+        labelText.setAttribute('text-anchor', 'middle');
+        x0 = w/2;
+        // fall through
+      case my.LabelPosition.ABOVE:
+        y0 = (1 - labelLines.length) * fontSize - 0.3;
+        break;
+      case my.LabelPosition.BELOW:
+        y0 = h + fontSize - 0.3;
+        break;
       }
-    }
-
-    my.Rect.prototype.inset = function(dx, dy) {
-      return new my.Rect(this.x + dx, this.y + dy, this.w - 2*dx, this.h - 2*dy);
-    }
-
-    my.Rect.prototype.outset = function(dx, dy) {
-      return new my.Rect(this.x - dx, this.y - dy, this.w + 2*dx, this.h + 2*dy);
-    }
-
-    my.Rect.prototype.offset = function(dx, dy) {
-      return new my.Rect(this.x+dx, this.y+dy, this.w, this.h);
-    }
-
-    my.Rect.prototype.toPath = function(r) {
-      var rect = my.createElement("rect");
-      rect.setAttribute("x", this.x);
-      rect.setAttribute("y", this.y);
-      rect.setAttribute("width", this.w);
-      rect.setAttribute("height", this.h);
-      if (r != null) {
-        rect.setAttribute("rx", r);
-        rect.setAttribute("ry", r);
+      for (var i = 0; i < labelLines.length; i++) {
+        var tspan = my.createElement("tspan");
+        tspan.setAttribute('x', x0);
+        tspan.setAttribute('y', y0 + i * fontSize);
+        tspan.appendChild(document.createTextNode(labelLines[i]));
+        labelText.appendChild(tspan);
       }
-      return rect;
+      this.group.appendChild(labelText);
     }
 
-    my.Rect.prototype.getX = function(d) {
-      return this.x + d * this.w;
+    if (lightId >= 0) {
+      this.lightOn = my.createElement("path");
+      this.lightOn.setAttribute("d", "M" + (rect.w/3) + "," + (rect.y+rect.h/25) + " h" + (rect.w/3) + " v" + (rect.h/3) + "  h" + (-rect.w/3) + " z");
+      this.lightOff = this.lightOn.cloneNode(true);
+      this.lightOn.setAttribute("fill", "#22ff22");
+      this.lightOff.setAttribute("fill", "#112211");
+      my.hideElement(this.lightOn);
+
+      this.group.appendChild(this.lightOn);
+      this.group.appendChild(this.lightOff);
     }
 
-    my.Rect.prototype.getY = function(d) {
-      return this.y + d * this.h;
-    }
+    this.group.addEventListener("touchstart", function(e) { that.press(e); }, true);
+    this.group.addEventListener("touchend", function(e) { that.release(e); }, true);
+    this.group.addEventListener("mousedown", function(e) { that.press(e); }, true);
+    this.group.addEventListener("mouseout", function(e) { that.release(e); }, true);
+    this.group.addEventListener("mouseup", function(e) { that.release(e); }, true);
 
-    my.Rect.prototype.viewBox = function() {
-      return `${this.x} ${this.y} ${this.w} ${this.h}`
-    }
+    this.isPressed = false;
+    this.lightState = my.Light.OFF;
+    this.lightIsOn = false;
+    this.blinkPhase = true;
 
-    my.Rect.prototype.applyTo = function(e) {
-      e.setAttribute('x', `${this.x}`);
-      e.setAttribute('y', `${this.y}`);
-      e.setAttribute('width', `${this.w}`);
-      e.setAttribute('height', `${this.h}`);
-    }
+    this.onPress = undefined;
+    this.onRelease = undefined;
+  }
 
-    my.displayRect = new my.Rect(15, 7, 82, 13);
-
-    my.Button = function(x, y, w, h, label, labelPosition, value, color, multiPage, lightId) {
-      var that = this;
-      this.rect = new my.Rect(x, y, w, h);
-
-      var rect = this.rect.inset(0.1, 0.1);
-      var translation = "translate(" + x + "," + y + ")";
-      this.halo = rect.toPath(0.5);
-      this.halo.setAttribute("stroke", "#666666");
-      this.halo.setAttribute("stroke-width", "2");
-      this.halo.setAttribute("fill", "none");
+  my.Button.prototype.showPressed = function(isPressed) {
+    if (isPressed) {
+      my.showElement(this.halo);
+    } else {
       my.hideElement(this.halo);
+    }
+  }
 
-      rect = rect.offset(-x, -y);
-      this.outline = rect.toPath(0.5);
-      this.outline.setAttribute("fill", color);
-      this.outline.setAttribute("stroke", "none");
+  my.Button.prototype.press = function(e) {
+    e.preventDefault();
 
-      this.group = my.createElement("g");
-      this.group.setAttribute("transform", translation);
-      this.group.appendChild(this.outline);
+    if (!this.isPressed) {
+      this.isPressed = true;
+      this.showPressed(true);
 
-      this.label = label;
-      this.labelPosition = labelPosition;
-      this.value = value;
-      this.color = color;
-      this.multiPage = multiPage;
-      this.lightId = lightId;
-
-      if (label != undefined) {
-        var labelLines = label.split("\n");
-        var fontSize = 1.4;
-        var labelText = my.createElement("text");
-        labelText.setAttribute('fill', 'white');
-        labelText.setAttribute('stroke', 'none');
-        labelText.setAttribute('font-size', fontSize);
-        labelText.setAttribute('font-family', 'Helvetica');
-        labelText.setAttribute('font-style', 'italic');
-        labelText.setAttribute('width', w);
-        labelText.setAttribute('dominant-baseline', 'bottom');
-        var x0 = 0;
-        var y0 = (1 - labelLines.length) * fontSize;
-        switch(labelPosition) {
-        case my.LabelPosition.ABOVE_CENTERED:
-          labelText.setAttribute('text-anchor', 'middle');
-          x0 = w/2;
-          // fall through
-        case my.LabelPosition.ABOVE:
-          y0 = (1 - labelLines.length) * fontSize - 0.3;
-          break;
-        case my.LabelPosition.BELOW:
-          y0 = h + fontSize - 0.3;
-          break;
-        }
-        for (var i = 0; i < labelLines.length; i++) {
-          var tspan = my.createElement("tspan");
-          tspan.setAttribute('x', x0);
-          tspan.setAttribute('y', y0 + i * fontSize);
-          tspan.appendChild(document.createTextNode(labelLines[i]));
-          labelText.appendChild(tspan);
-        }
-        this.group.appendChild(labelText);
+      if (this.onPress != undefined) {
+        this.onPress(this);
       }
+    }
 
-      if (lightId >= 0) {
-        this.lightOn = my.createElement("path");
-        this.lightOn.setAttribute("d", "M" + (rect.w/3) + "," + (rect.y+rect.h/25) + " h" + (rect.w/3) + " v" + (rect.h/3) + "  h" + (-rect.w/3) + " z");
-        this.lightOff = this.lightOn.cloneNode(true);
-        this.lightOn.setAttribute("fill", "#22ff22");
-        this.lightOff.setAttribute("fill", "#112211");
-        my.hideElement(this.lightOn);
+    return false;
+  }
 
-        this.group.appendChild(this.lightOn);
-        this.group.appendChild(this.lightOff);
-      }
+  my.Button.prototype.release = function(e) {
+    e.preventDefault();
 
-      this.group.addEventListener("touchstart", function(e) { that.press(e); }, true);
-      this.group.addEventListener("touchend", function(e) { that.release(e); }, true);
-      this.group.addEventListener("mousedown", function(e) { that.press(e); }, true);
-      this.group.addEventListener("mouseout", function(e) { that.release(e); }, true);
-      this.group.addEventListener("mouseup", function(e) { that.release(e); }, true);
-
+    if (this.isPressed) {
       this.isPressed = false;
-      this.lightState = my.Light.OFF;
-      this.lightIsOn = false;
-      this.blinkPhase = true;
+      this.showPressed(false);
 
-      this.onPress = undefined;
-      this.onRelease = undefined;
-    }
-
-    my.Button.prototype.showPressed = function(isPressed) {
-      if (isPressed) {
-        my.showElement(this.halo);
-      } else {
-        my.hideElement(this.halo);
+      if (this.onRelease != undefined) {
+        this.onRelease(this);
       }
     }
 
-    my.Button.prototype.press = function(e) {
-      e.preventDefault();
+    return false;
+  }
 
-      if (!this.isPressed) {
-        this.isPressed = true;
-        this.showPressed(true);
+  my.Button.prototype.updateLight = function() {
+    var on = this.lightState == my.Light.ON || (this.blinkPhase && this.lightState == my.Light.BLINK);
+    if (on != this.lightIsOn) {
+      my.hideElement(this.lightIsOn ? this.lightOn : this.lightOff);
+      this.lightIsOn = on;
+      my.showElement(this.lightIsOn ? this.lightOn : this.lightOff);
+    }
+  }
 
-        if (this.onPress != undefined) {
-          this.onPress(this);
-        }
-      }
+  my.Button.prototype.setLight = function(state) {
+    this.lightState = state;
+    this.updateLight();
+  }
 
-      return false;
+  my.Button.prototype.setBlinkPhase = function(phase) {
+    this.blinkPhase = phase;
+    this.updateLight();
+  }
+
+  my.Touch = function(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+
+  my.makeTouch = function(e) {
+    return new my.Touch(e.clientX, e.clientY);
+  }
+
+  my.Slider = function(x, y, w, h, channel, value) {
+
+    function makeRectPath(x, y, w, h, color) {
+      path = new my.Rect(x, y, w, h).toPath();
+      path.setAttribute("fill", color);
+      return path;
     }
 
-    my.Button.prototype.release = function(e) {
-      e.preventDefault();
+    var that = this;
+    this.channel = channel;
+    this.value = value;
 
-      if (this.isPressed) {
-        this.isPressed = false;
-        this.showPressed(false);
+    this.rect = new my.Rect(x, y, w, h);
+    var rect = this.rect.offset(-x, -y);
+    var translation = "translate(" + x + "," + y + ")";
+    this.group = my.createElement("g");
+    this.group.setAttribute("transform", translation);
 
-        if (this.onRelease != undefined) {
-          this.onRelease(this);
-        }
-      }
+    this.frameColor = "#333333";
+    this.frameActiveColor = "#666666";
+    this.frame = rect.inset(0.25, 0.25).toPath();
+    this.frame.setAttribute("stroke", this.frameColor);
+    this.frame.setAttribute("stroke-width", "0.5");
+    this.group.appendChild(this.frame);
 
-      return false;
-    }
+    this.handleX = 0.75;
+    this.handleW = w - 1.5;
+    this.handleH = 4;
+    this.handleMinY = 0.75;
+    this.handleMaxY = h - 0.75 - this.handleH;
 
-    my.Button.prototype.updateLight = function() {
-      var on = this.lightState == my.Light.ON || (this.blinkPhase && this.lightState == my.Light.BLINK);
-      if (on != this.lightIsOn) {
-        my.hideElement(this.lightIsOn ? this.lightOn : this.lightOff);
-        this.lightIsOn = on;
-        my.showElement(this.lightIsOn ? this.lightOn : this.lightOff);
-      }
-    }
+    this.handle = my.createElement("g");
+    this.handle.appendChild(makeRectPath(0, 0, this.handleW, this.handleH, "#333333"));
+    this.handle.appendChild(makeRectPath(0, 0, this.handleW, 0.75, "#444444"));
+    this.handle.appendChild(makeRectPath(0, 1.75, this.handleW, 0.25, "#222222"));
+    this.handle.appendChild(makeRectPath(0, 2, this.handleW, 0.25, "#444444"));
+    this.handle.appendChild(makeRectPath(0, 3.25, this.handleW, 0.75, "#222222"));
+    this.group.appendChild(this.handle);
 
-    my.Button.prototype.setLight = function(state) {
-      this.lightState = state;
-      this.updateLight();
-    }
+    this.setValue(value);
 
-    my.Button.prototype.setBlinkPhase = function(phase) {
-      this.blinkPhase = phase;
-      this.updateLight();
-    }
+    this.handle.addEventListener("touchstart", function(e) { that.touchstart(e); }, true);
+    this.group.addEventListener("touchmove", function(e) { that.touchmove(e); }, true);
+    this.group.addEventListener("touchend", function(e) { that.touchend(e); }, true);
+    this.group.addEventListener("touchcancel", function(e) { that.touchend(e); }, true);
 
-    my.Touch = function(x, y) {
-      this.x = x;
-      this.y = y;
-    }
+    this.handle.addEventListener("mousedown", function(e) { that.grab(e.clientX, e.clientY); }, true);
+    this.group.addEventListener("mousemove", function(e) { that.drag(e.clientX, e.clientY); }, true);
+    this.group.addEventListener("mouseup", function(e) { that.release(); }, true);
 
-    my.makeTouch = function(e) {
-      return new my.Touch(e.clientX, e.clientY);
-    }
+    this.onValueChanged = undefined;
+    this.isGrabbed = false;
+    this.activeTouches = new Map();
 
-    my.Slider = function(x, y, w, h, channel, value) {
+  }
 
-      function makeRectPath(x, y, w, h, color) {
-        path = new my.Rect(x, y, w, h).toPath();
-        path.setAttribute("fill", color);
-        return path;
-      }
+  my.Slider.prototype.setValue = function(value) {
+    console.log(`Moving slider to fraction ${value}`);
 
-      var that = this;
-      this.channel = channel;
-      this.value = value;
+    this.value = Math.max(0.0, Math.min((1.0, value)));
+    this.handleY = this.handleMinY + (1.0 - value) * (this.handleMaxY - this.handleMinY);
+    this.handle.setAttribute("transform", "translate(" + this.handleX + "," + this.handleY + ")");
+  }
 
-      this.rect = new my.Rect(x, y, w, h);
-      var rect = this.rect.offset(-x, -y);
-      var translation = "translate(" + x + "," + y + ")";
-      this.group = my.createElement("g");
-      this.group.setAttribute("transform", translation);
+  my.Slider.prototype.setHandleY = function(handleY) {
+    this.handleY = Math.max(this.handleMinY, Math.min(this.handleMaxY, handleY));
+    // console.log("Setting handleY to " + handleY + " => " + this.handleY);
+    this.value = 1.0 - (this.handleY - this.handleMinY) / (this.handleMaxY - this.handleMinY);
+    this.handle.setAttribute("transform", "translate(" + this.handleX + "," + this.handleY + ")");
+  }
 
-      this.frameColor = "#333333";
-      this.frameActiveColor = "#666666";
-      this.frame = rect.inset(0.25, 0.25).toPath();
-      this.frame.setAttribute("stroke", this.frameColor);
-      this.frame.setAttribute("stroke-width", "0.5");
-      this.group.appendChild(this.frame);
+  my.Slider.prototype.grab = function(x, y) {
+    this.isGrabbed = true;
+    this.frame.setAttribute("stroke", this.frameActiveColor);
+    var p = my.pointIn(this.group, x, y);
+    this.dragOffset = p.y - this.handleY;
+    // console.log("Grabbing with handleY=" + this.handleY + ", p.y=" + p.y + " => dragOffset=" + this.dragOffset);
+  }
 
-      this.handleX = 0.75;
-      this.handleW = w - 1.5;
-      this.handleH = 4;
-      this.handleMinY = 0.75;
-      this.handleMaxY = h - 0.75 - this.handleH;
-
-      this.handle = my.createElement("g");
-      this.handle.appendChild(makeRectPath(0, 0, this.handleW, this.handleH, "#333333"));
-      this.handle.appendChild(makeRectPath(0, 0, this.handleW, 0.75, "#444444"));
-      this.handle.appendChild(makeRectPath(0, 1.75, this.handleW, 0.25, "#222222"));
-      this.handle.appendChild(makeRectPath(0, 2, this.handleW, 0.25, "#444444"));
-      this.handle.appendChild(makeRectPath(0, 3.25, this.handleW, 0.75, "#222222"));
-      this.group.appendChild(this.handle);
-
-      this.setValue(value);
-
-      this.handle.addEventListener("touchstart", function(e) { that.touchstart(e); }, true);
-      this.group.addEventListener("touchmove", function(e) { that.touchmove(e); }, true);
-      this.group.addEventListener("touchend", function(e) { that.touchend(e); }, true);
-      this.group.addEventListener("touchcancel", function(e) { that.touchend(e); }, true);
-
-      this.handle.addEventListener("mousedown", function(e) { that.grab(e.clientX, e.clientY); }, true);
-      this.group.addEventListener("mousemove", function(e) { that.drag(e.clientX, e.clientY); }, true);
-      this.group.addEventListener("mouseup", function(e) { that.release(); }, true);
-
-      this.onValueChanged = undefined;
-      this.isGrabbed = false;
-      this.activeTouches = new Map();
-
-    }
-
-    my.Slider.prototype.setValue = function(value) {
-      this.value = Math.max(0.0, Math.min((1.0, value)));
-      this.handleY = this.handleMinY + (1.0 - value) * (this.handleMaxY - this.handleMinY);
-      this.handle.setAttribute("transform", "translate(" + this.handleX + "," + this.handleY + ")");
-    }
-
-    my.Slider.prototype.setHandleY = function(handleY) {
-      this.handleY = Math.max(this.handleMinY, Math.min(this.handleMaxY, handleY));
-      // console.log("Setting handleY to " + handleY + " => " + this.handleY);
-      this.value = 1.0 - (this.handleY - this.handleMinY) / (this.handleMaxY - this.handleMinY);
-      this.handle.setAttribute("transform", "translate(" + this.handleX + "," + this.handleY + ")");
-    }
-
-    my.Slider.prototype.grab = function(x, y) {
-      this.isGrabbed = true;
-      this.frame.setAttribute("stroke", this.frameActiveColor);
+  my.Slider.prototype.drag = function(x, y) {
+    if (this.isGrabbed) {
       var p = my.pointIn(this.group, x, y);
-      this.dragOffset = p.y - this.handleY;
-      // console.log("Grabbing with handleY=" + this.handleY + ", p.y=" + p.y + " => dragOffset=" + this.dragOffset);
-    }
-
-    my.Slider.prototype.drag = function(x, y) {
-      if (this.isGrabbed) {
-        var p = my.pointIn(this.group, x, y);
-        var newHandleY = p.y - this.dragOffset;
-        // console.log("Dragged with p.y=" + p.y + ", dragOffset=" + this.dragOffset + " => new handleY=" + newHandleY);
-        this.setHandleY(newHandleY);
-        if (this.onValueChanged != null) {
-          this.onValueChanged(this);
-        }
+      var newHandleY = p.y - this.dragOffset;
+      // console.log("Dragged with p.y=" + p.y + ", dragOffset=" + this.dragOffset + " => new handleY=" + newHandleY);
+      this.setHandleY(newHandleY);
+      if (this.onValueChanged != null) {
+        this.onValueChanged(this);
       }
     }
+  }
 
-    my.Slider.prototype.release = function(e) {
-      this.isGrabbed = false;
-      this.frame.setAttribute("stroke", this.frameColor);
+  my.Slider.prototype.release = function(e) {
+    this.isGrabbed = false;
+    this.frame.setAttribute("stroke", this.frameColor);
+  }
+
+  my.Slider.prototype.activeTouchCenter = function() {
+    var n = this.activeTouches.size;
+    if (n <= 0) {
+      return undefined;
+    }
+    var x = 0;
+    var y = 0;
+
+    for (const touch of this.activeTouches.values()) {
+      x += touch.x;
+      y += touch.y;
     }
 
-    my.Slider.prototype.activeTouchCenter = function() {
-      var n = this.activeTouches.size;
-     if (n <= 0) {
-        return undefined;
-      }
-      var x = 0;
-      var y = 0;
+    return new my.Touch(x / n, y / n);
+  }
 
-      for (const touch of this.activeTouches.values()) {
-        x += touch.x;
-        y += touch.y;
-      }
+  my.Slider.prototype.touchstart = function(e) {
+    e.preventDefault();
 
-      return new my.Touch(x / n, y / n);
+    var wasEmpty = this.activeTouches.size == 0;
+    for (var i = 0; i < e.targetTouches.length; i++) {
+      var touch = e.targetTouches.item(i);
+      this.activeTouches.set(touch.identifier, my.makeTouch(touch));
     }
 
-    my.Slider.prototype.touchstart = function(e) {
-      e.preventDefault();
+    center = this.activeTouchCenter();
+    if (center != null) {
+      this.grab(center.x, center.y);
+    }
 
-      var wasEmpty = this.activeTouches.size == 0;
-      for (var i = 0; i < e.targetTouches.length; i++) {
-        var touch = e.targetTouches.item(i);
+    return false;
+  }
+
+  my.Slider.prototype.touchmove = function(e) {
+    e.preventDefault();
+
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      var touch = e.changedTouches.item(i);
+      if (this.activeTouches.has(touch.identifier)) {
         this.activeTouches.set(touch.identifier, my.makeTouch(touch));
       }
+    }
+    center = this.activeTouchCenter();
+    if (center != null) {
+      this.drag(center.x, center.y);
+    }
 
+    return false;
+  }
+
+  my.Slider.prototype.touchend = function(e) {
+    e.preventDefault();
+
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      var touch = e.changedTouches.item(i);
+      this.activeTouches.delete(touch.identifier)
+    }
+    if (this.activeTouches.size == 0) {
+      this.release();
+    } else {
       center = this.activeTouchCenter();
       if (center != null) {
         this.grab(center.x, center.y);
       }
-
-      return false;
     }
 
-    my.Slider.prototype.touchmove = function(e) {
-      e.preventDefault();
+    return false;
+  }
 
-      for (var i = 0; i < e.changedTouches.length; i++) {
-        var touch = e.changedTouches.item(i);
-        if (this.activeTouches.has(touch.identifier)) {
-          this.activeTouches.set(touch.identifier, my.makeTouch(touch));
-        }
-      }
-      center = this.activeTouchCenter();
-      if (center != null) {
-        this.drag(center.x, center.y);
-      }
+  my.Panel = function(serverUrl, keyboard, version) {
+    this.serverUrl = serverUrl;
+    this.keyboard = keyboard;
+    this.version = version;
 
-      return false;
+    this.container = my.createElement("svg");
+    this.container.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    this.container.setAttribute("width", "2000");
+    this.container.setAttribute("height", "375");
+    this.container.setAttribute("overflow", "scroll");
+
+    this.haloContainer = my.createElement("g");
+    this.container.appendChild(this.haloContainer);
+
+    this.mainContainer = my.createElement("g");
+    this.container.appendChild(this.mainContainer);
+
+    this.displayContainer = my.createElement("svg");
+    this.display = new my.Display(this.displayContainer, 2, 40);
+    this.displayContainer.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    this.displayContainer.setAttribute("x", my.displayRect.x);
+    this.displayContainer.setAttribute("y", my.displayRect.y);
+    this.displayContainer.setAttribute("width", my.displayRect.w);
+    this.displayContainer.setAttribute("height", my.displayRect.h);
+    this.container.appendChild(this.displayContainer);
+    this.rect = my.displayRect;
+
+    this.buttons = new Array();
+    this.lightButtons = new Array();
+    this.analogControls = new Array();
+    this.addControls(keyboard);
+
+    let messageRect = my.Rect.from(this.displayContainer);
+
+    this.messageBox = my.createElement('svg');
+    messageRect.applyTo(this.messageBox);
+    my.hideElement(this.messageBox);
+
+    let messageBackground = my.createElement('rect');
+    this.messageBox.appendChild(messageBackground);
+    messageBackground.setAttribute('width', '100%');
+    messageBackground.setAttribute('height', '100%');
+    messageBackground.setAttribute('fill', '#000000aa');
+
+    this.messageText = my.createElement('text');
+    this.messageBox.appendChild(this.messageText);
+
+    this.messageText.setAttribute('fill', "#aaaaaaff");
+    this.messageText.setAttribute('stroke', 'none');
+    this.messageText.setAttribute('font-size', `${messageRect.h / 2.5}`);
+    this.messageText.setAttribute('font-family', 'Helvetica');
+    this.messageText.setAttribute('font-style', 'italic');
+    this.messageText.setAttribute('text-anchor', 'middle');
+    this.messageText.setAttribute('dominant-baseline', 'middle');
+    this.messageText.setAttribute('x', '50%');
+    this.messageText.setAttribute('y', '50%');
+
+    this.container.appendChild(this.messageBox);
+
+    this.serverUrl = serverUrl;
+    this.needRefresh = true;
+    try {
+      this.connect();
+    } catch (e) {
+      console.log("Unable to connect to '" + serverUrl + "': " + e);
     }
 
-    my.Slider.prototype.touchend = function(e) {
-      e.preventDefault();
+    this.blinkPhase = 0;
+  }
 
-      for (var i = 0; i < e.changedTouches.length; i++) {
-        var touch = e.changedTouches.item(i);
-        this.activeTouches.delete(touch.identifier)
-      }
-      if (this.activeTouches.size == 0) {
-        this.release();
+  my.Panel.prototype.setBlinkPhase = function(blinkPhase) {
+    this.blinkPhase = blinkPhase % 4;
+    this.display.setBlinkPhase(this.blinkPhase & 2);
+    var buttonPhase = (this.blinkPhase & 1) == 0;
+    for (var i = 0; i < this.lightButtons.length; i++) {
+      this.lightButtons[i].setBlinkPhase(buttonPhase);
+    }
+  }
+
+  my.Panel.prototype.showMessage = function(message) {
+    if (message != this.serverMessage) {
+      this.serverMessage = message;
+      this.messageText.replaceChildren(document.createTextNode(message));
+      if (message.length == 0) {
+        my.hideElement(this.messageBox);
       } else {
-        center = this.activeTouchCenter();
-        if (center != null) {
-          this.grab(center.x, center.y);
-        }
-      }
-
-      return false;
-    }
-
-    my.Panel = function(serverUrl, keyboard, version) {
-      this.serverUrl = serverUrl;
-      this.keyboard = keyboard;
-      this.version = version;
-
-      this.container = my.createElement("svg");
-      this.container.setAttribute("preserveAspectRatio", "xMidYMid meet");
-      this.container.setAttribute("width", "2000");
-      this.container.setAttribute("height", "375");
-      this.container.setAttribute("overflow", "scroll");
-
-      this.haloContainer = my.createElement("g");
-      this.container.appendChild(this.haloContainer);
-
-      this.mainContainer = my.createElement("g");
-      this.container.appendChild(this.mainContainer);
-
-      this.displayContainer = my.createElement("svg");
-      this.display = new my.Display(this.displayContainer, 2, 40);
-      this.displayContainer.setAttribute("preserveAspectRatio", "xMidYMid meet");
-      this.displayContainer.setAttribute("x", my.displayRect.x);
-      this.displayContainer.setAttribute("y", my.displayRect.y);
-      this.displayContainer.setAttribute("width", my.displayRect.w);
-      this.displayContainer.setAttribute("height", my.displayRect.h);
-      this.container.appendChild(this.displayContainer);
-      this.rect = my.displayRect;
-
-      this.buttons = new Array();
-      this.lightButtons = new Array();
-      this.analogControls = new Array();
-      this.addControls(keyboard);
-
-      let messageRect = my.Rect.from(this.displayContainer);
-
-      this.messageBox = my.createElement('svg');
-      messageRect.applyTo(this.messageBox);
-      my.hideElement(this.messageBox);
-
-      let messageBackground = my.createElement('rect');
-      this.messageBox.appendChild(messageBackground);
-      messageBackground.setAttribute('width', '100%');
-      messageBackground.setAttribute('height', '100%');
-      messageBackground.setAttribute('fill', '#000000aa');
-
-      this.messageText = my.createElement('text');
-      this.messageBox.appendChild(this.messageText);
-
-      this.messageText.setAttribute('fill', "#aaaaaaff");
-      this.messageText.setAttribute('stroke', 'none');
-      this.messageText.setAttribute('font-size', `${messageRect.h / 2.5}`);
-      this.messageText.setAttribute('font-family', 'Helvetica');
-      this.messageText.setAttribute('font-style', 'italic');
-      this.messageText.setAttribute('text-anchor', 'middle');
-      this.messageText.setAttribute('dominant-baseline', 'middle');
-      this.messageText.setAttribute('x', '50%');
-      this.messageText.setAttribute('y', '50%');
-
-      this.container.appendChild(this.messageBox);
-
-      this.serverUrl = serverUrl;
-      this.needRefresh = true;
-      try {
-        this.connect();
-      } catch (e) {
-        console.log("Unable to connect to '" + serverUrl + "': " + e);
-      }
-
-      this.blinkPhase = 0;
-    }
-
-    my.Panel.prototype.setBlinkPhase = function(blinkPhase) {
-      this.blinkPhase = blinkPhase % 4;
-      this.display.setBlinkPhase(this.blinkPhase & 2);
-      var buttonPhase = (this.blinkPhase & 1) == 0;
-      for (var i = 0; i < this.lightButtons.length; i++) {
-        this.lightButtons[i].setBlinkPhase(buttonPhase);
+        my.showElement(this.messageBox);
       }
     }
+  }
 
-    my.Panel.prototype.showMessage = function(message) {
-      if (message != this.serverMessage) {
-        this.serverMessage = message;
-        this.messageText.replaceChildren(document.createTextNode(message));
-        if (message.length == 0) {
-          my.hideElement(this.messageBox);
-        } else {
-          my.showElement(this.messageBox);
-        }
-      }
+  my.Panel.prototype.connect = function() {
+    var that = this;
+    var panel = this;
+    var reconnect = function() {
+      that.connect();
     }
 
-    my.Panel.prototype.connect = function() {
-      var that = this;
-      var panel = this;
-      var reconnect = function() {
-        that.connect();
-      }
+    this.socket = new WebSocket(this.serverUrl);
 
-      this.socket = new WebSocket(this.serverUrl);
+    this.socket.onopen = function(event) {
+      // console.log("opened: {event}");
+      // clear our 'connecting' message
+      panel.showMessage('');
+      panel.sendString("I"); // Request server information
+    };
 
-      this.socket.onopen = function(event) {
-        // console.log("opened: {event}");
-        // clear our 'connecting' message
-        panel.showMessage('');
-        panel.sendString("I"); // Request server information
-      };
-
-      this.socket.onmessage = function(event) {
-        var data = event.data;
-        var c = data[0];
-        var rest = data.slice(1).trim();
-
-        // console.log(`Handling message '${data}'`);
-
-        if (c == 'A') {
-          // console.log("handling analog value")
-          panel.handleAnalogValue(rest);
-        } else if (c == 'B') {
-          // console.log("handling button state")
-          panel.handleButtonState(rest);
-        } else if (c == 'D') {
-          // console.log("handling display data")
-          panel.handleDisplayData(rest);
-        } else if (c == 'L') {
-          // console.log("handling Light state")
-          panel.handleLightState(rest);
-        } else if (c == 'P') {
-          // console.log("handling blink Phase")
-          panel.handleBlinkPhase(rest);
-        } else if (c == 'I') {
-          // console.log("handling server information");
-          panel.handleServerInformation(rest);
-        } else if (c == 'M') {
-          // console.log("handling server message");
-          panel.handleServerMessage(rest);
-        }
-      };
-
-      this.socket.onclose = function(event) {
-        // console.log("closed: ", event);
-        panel.showMessage("Reconnecting to server ...");
-        panel.needRefresh = true;
-        // reconnect after 1 second
-        setTimeout(reconnect, 1000);
-      };
-
-      this.socket.onerror = function(event) {
-        console.log("web socket error: ", event);
-      };
-    }
-
-    my.Panel.prototype.addButton = function(x, y, w, h, label, labelPosition, value, color, multiPage, lightId) {
-      var that = this;
-      var button = new my.Button(x, y, w, h, label, labelPosition, value, color, multiPage, lightId);
-      this.haloContainer.appendChild(button.halo);
-
-      if (lightId >= 0) {
-        if (lightId >= this.lightButtons.length) {
-          this.lightButtons.length = lightId + 1;
-        }
-        this.lightButtons[lightId] = button;
-      }
-
-      this.mainContainer.appendChild(button.group);
-      this.buttons[value] = button;
-
-      button.onPress = function(b) {
-        that.onButtonPressed(b);
-      }
-      button.onRelease = function(b) {
-        that.onButtonReleased(b);
-      }
-
-      return button;
-    }
-
-    my.Panel.prototype.addSlider = function(x, y, w, h, channel, value) {
-      var that = this;
-      var slider = new my.Slider(x, y, w, h, channel, value);
-
-      this.mainContainer.appendChild(slider.group);
-      this.analogControls[channel] = slider;
-
-      slider.onValueChanged = function(s) {
-        that.onAnalogValueChanged(s);
-      }
-
-      return slider;
-    }
-
-    my.Panel.prototype.addButtonBelowDisplay = function(x, y, label, value, shade) {
-      return this.addButton(x, y, 6, 4, label, my.LabelPosition.BELOW, value, shade, false, -1);
-    }
-
-    my.Panel.prototype.addButtonWithLightBelowDisplay = function(x, y, label, value, shade, lightId) {
-      return this.addButton(x, y, 6, 4, label, my.LabelPosition.BELOW, value, shade, false, lightId);
-    }
-
-    my.Panel.prototype.addLargeButton = function(x, y, label, value, shade) {
-      return this.addButton(x, y, 6, 4, label, my.LabelPosition.ABOVE, value, shade, false, -1);
-    }
-
-    my.Panel.prototype.addLargeButtonWithLight = function(x, y, label, value, shade, lightId) {
-      return this.addButton(x, y, 6, 4, label, my.LabelPosition.ABOVE, value, shade, false, lightId);
-    }
-
-    my.Panel.prototype.addSmallButton = function(x, y, label, value, shade, multiPage) {
-      return this.addButton(x, y, 6, 2, label, my.LabelPosition.ABOVE, value, shade, multiPage, -1);
-    }
-
-    my.Panel.prototype.addIncDecButton = function(x, y, label, value, shade, multiPage) {
-      return this.addButton(x, y, 6, 2, label, my.LabelPosition.ABOVE_CENTERED, value, shade, multiPage, -1);
-    }
-
-    my.Panel.prototype.addControls = function(keyboard) {
-      // console.log("keyboard is '" + keyboard + "'");
-
-      // Normalize the keyboard string.
-      var hasSeq = false;
-      var hasBankSet = false;
-      keyboard = keyboard.toLowerCase();
-      if (keyboard.indexOf('sd') != -1) {
-        hasSeq = true;
-
-        if (keyboard.indexOf('1') != -1) {
-          hasBankSet = true;
-
-          if (keyboard.indexOf('32') != -1) {
-            keyboard = my.Keyboard.SD1_32;
-          } else {
-            keyboard = my.Keyboard.SD1;
-          }
-        } else {
-          keyboard = my.Keyboard.VFX_SD;
-        }
-      } else {
-        keyboard = my.Keyboard.VFX;
-      }
-
-      // console.log("normalized keyboard is '" + keyboard + "'");
-
-      var cartString = hasBankSet ? "BankSet" : "Cart";
-
-      this.addButtonWithLightBelowDisplay(10, 29, cartString, 52, my.Shade.LIGHT, 0xf);
-      this.addButtonWithLightBelowDisplay(16, 29, "Sounds",   53, my.Shade.LIGHT, 0xd);
-      this.addButtonWithLightBelowDisplay(22, 29, "Presets",  54, my.Shade.LIGHT, 0x7);
-      if (hasSeq) {
-        this.addButtonBelowDisplay     (28, 29, "Seq",      51, my.Shade.LIGHT);
-      }
-
-      this.addButtonWithLightBelowDisplay(42, 29, "0", 55, my.Shade.MEDIUM, 0xe);
-      this.addButtonWithLightBelowDisplay(48, 29, "1", 56, my.Shade.MEDIUM, 0x6);
-      this.addButtonWithLightBelowDisplay(54, 29, "2", 57, my.Shade.MEDIUM, 0x4);
-      this.addButtonWithLightBelowDisplay(60, 29, "3", 46, my.Shade.MEDIUM, 0xc);
-      this.addButtonWithLightBelowDisplay(66, 29, "4", 47, my.Shade.MEDIUM, 0x3);
-      this.addButtonWithLightBelowDisplay(72, 29, "5", 48, my.Shade.MEDIUM, 0xb);
-      this.addButtonWithLightBelowDisplay(78, 29, "6", 49, my.Shade.MEDIUM, 0x2);
-      this.addButtonWithLightBelowDisplay(84, 29, "7", 35, my.Shade.MEDIUM, 0xa);
-      this.addButtonWithLightBelowDisplay(90, 29, "8", 34, my.Shade.MEDIUM, 0x1);
-      this.addButtonWithLightBelowDisplay(96, 29, "9", 25, my.Shade.MEDIUM, 0x9);
-
-      // Large buttons on the main panel part
-      this.addLargeButton         (108, 29, "Replace\nProgram", 29, my.Shade.MEDIUM);
-      this.addLargeButtonWithLight(114, 29, "1-6",              30, my.Shade.MEDIUM, 0x0);
-      this.addLargeButtonWithLight(120, 29, "7-12",             31, my.Shade.MEDIUM, 0x8);
-
-      this.addLargeButton         (154, 29, "Select\nVoice", 5, my.Shade.MEDIUM);
-      this.addLargeButton         (160, 29, "Copy",          9, my.Shade.MEDIUM);
-      this.addLargeButton         (166, 29, "Write",         3, my.Shade.MEDIUM);
-      this.addLargeButtonWithLight(172, 29, "Compare",       8, my.Shade.MEDIUM, 0x5);
-
-      // Small buttons, main panel
-      // -- Performance:
-      this.addSmallButton(108, 20, "Patch\nSelect",   26, my.Shade.DARK, true);
-      this.addSmallButton(114, 20, "MIDI",            27, my.Shade.DARK, true);
-      this.addSmallButton(120, 20, "Effects",         28, my.Shade.DARK, true);
-
-      this.addSmallButton(108, 13, "Key\nZone",       39, my.Shade.DARK, false);
-      this.addSmallButton(114, 13, "Trans-\npose",    40, my.Shade.DARK, false);
-      this.addSmallButton(120, 13, "Release",         41, my.Shade.DARK, false);
-
-      this.addSmallButton(108,  6, "Volume",          36, my.Shade.DARK, false);
-      this.addSmallButton(114,  6, "Pan",             37, my.Shade.DARK, false);
-      this.addSmallButton(120,  6, "Timbre",          38, my.Shade.DARK, false);
-
-      // Sequencer / System, both large and small buttons:
-      if (hasSeq) {
-        // The 'Master', 'Storage' and 'MIDI Control' buttons are small & at the to,
-        // the sequencer buttons are big and at the bottom.
-        this.addLargeButton(131, 29, "Rec",           19, my.Shade.MEDIUM);
-        this.addLargeButton(137, 29, "Stop\n/Cont",   22, my.Shade.MEDIUM);
-        this.addLargeButton(143, 29, "Play",          23, my.Shade.MEDIUM);
-
-        this.addSmallButton(131, 20, "Click",         32, my.Shade.DARK, false);
-        this.addSmallButton(137, 20, "Seq\nControl",  18, my.Shade.DARK, true);
-        this.addSmallButton(143, 20, "Locate",        33, my.Shade.DARK, true);
-
-        this.addSmallButton(131, 13, "Song",          60, my.Shade.DARK, false);
-        this.addSmallButton(137, 13, "Seq",           59, my.Shade.DARK, false);
-        this.addSmallButton(143, 13, "Track",         61, my.Shade.DARK, false);
-
-        this.addSmallButton(131,  6, "Master",        20, my.Shade.LIGHT, true);
-        this.addSmallButton(137,  6, "Storage",       21, my.Shade.LIGHT, false);
-        this.addSmallButton(143,  6, "MIDI\nControl", 24, my.Shade.LIGHT, true);
-      } else {
-        // The 'Master', 'Storage' and 'MIDI Control' buttons are large & at the bottom,
-        // and there are no sequencer buttons
-        this.addLargeButton(131, 29, "Master",        20, my.Shade.LIGHT, true);
-        this.addLargeButton(137, 29, "Storage",       21, my.Shade.LIGHT, false);
-        this.addLargeButton(143, 29, "MIDI\nControl", 24, my.Shade.LIGHT, true);
-      }
-
-      // -- Programming:
-      this.addSmallButton(154, 20, "Wave",             4, my.Shade.DARK, false);
-      this.addSmallButton(160, 20, "Mod\nMixer",       6, my.Shade.DARK, false);
-      this.addSmallButton(166, 20, "Program\nControl", 2, my.Shade.DARK, false);
-      this.addSmallButton(172, 20, "Effects",          7, my.Shade.DARK, true);
-
-      this.addSmallButton(154, 13, "Pitch",           11, my.Shade.DARK, false);
-      this.addSmallButton(160, 13, "Pitch\nMod",      13, my.Shade.DARK, false);
-      this.addSmallButton(166, 13, "Filters",         15, my.Shade.DARK, true);
-      this.addSmallButton(172, 13, "Output",          17, my.Shade.DARK, true);
-
-      this.addSmallButton(154,  6, "LFO",             10, my.Shade.DARK, true);
-      this.addSmallButton(160,  6, "Env1",            12, my.Shade.DARK, true);
-      this.addSmallButton(166,  6, "Env2",            14, my.Shade.DARK, true);
-      this.addSmallButton(172,  6, "Env3",            16, my.Shade.DARK, true);
-
-      // Display buttons - approximate:
-      this.addSmallButton(32, 21, "", 50, my.Shade.DARK, false);
-      this.addSmallButton(57, 21, "", 44, my.Shade.DARK, false);
-      this.addSmallButton(82, 21, "", 45, my.Shade.DARK, false);
-
-      this.addSmallButton(32,  4, "", 58, my.Shade.DARK, false);
-      this.addSmallButton(57,  4, "", 42, my.Shade.DARK, false);
-      this.addSmallButton(82,  4, "", 43, my.Shade.DARK, false);
-
-      // Value slider
-      var valueSlider = this.addSlider(-2.75, 4, 7, 22, 3, 0.7);
-
-      // Increment and Decrement
-      this.addIncDecButton(-12.5, 22, "\u25BC", 63, my.Shade.DARK, false);
-      this.addIncDecButton(-12.5, 12, "\u25B2", 62, my.Shade.DARK, false);
-
-      // Volume slider
-      var volumeSlider = this.addSlider(-30, 4, 7, 22, 5, 1.0);
-
-      for (var i = 1; i < this.buttons.length; i++) {
-        var button = this.buttons[i];
-        if (button != null) {
-          this.rect = this.rect.union(button.rect);
-        }
-      }
-      this.rect = this.rect.union(valueSlider.rect);
-      this.rect = this.rect.union(volumeSlider.rect);
-
-      this.rect = this.rect.outset(2, 2);
-
-      this.container.setAttribute("viewBox", this.rect.viewBox());
-    }
-
-    my.Panel.prototype.sendString = function(s) {
-      if (this.socket != undefined && this.socket.readyState == WebSocket.OPEN) {
-        // console.log(`Sending '${s}'`);
-        this.socket.send(s);
-      }
-    }
-
-    my.Panel.prototype.onButtonPressed = function(button) {
-      this.sendString("BD " + button.value);
-    }
-
-    my.Panel.prototype.onButtonReleased = function(button) {
-      this.sendString("BU " + button.value);
-    }
-
-    my.Panel.prototype.onAnalogValueChanged = function(slider) {
-      // 0.05 == 0; 0.95 == 760
-      var value = (slider.value - 0.05) / 0.9;
-      value = 760 * value;
-      value = Math.round(Math.max(0, Math.min(1023, value)));
-      var s = "A " + slider.channel + " " + value;
-
-      // console.log(s);
-      this.sendString(s);
-    }
-
-    my.Panel.prototype.handleDisplayData = function(data) {
+    this.socket.onmessage = function(event) {
+      var data = event.data;
       var c = data[0];
-      if (c == 'X') {
-        // Clear the screen
-        // console.log("Clearing the screen");
-        this.display.clear();
-      } else if (c == 'C') {
-        // Character data
-        var s = data.slice(1).trim();
-        // console.log(`Displaying characters: '${s}'`);
-        var parts = s.split(" ");
-        // console.log(`Have ${parts.length} parts`);
-        if (parts.length >= 2) {
-          let row = parseInt(parts[0]);
-          let column = parseInt(parts[1]);
-          // console.log(`Starting at ${row},${column}`);
-          for (i = 2; i < parts.length - 1; i+= 2) {
-            let ch = parseInt(parts[i], 16);
-            let attr = parseInt(parts[i+1], 16);
-            let underline = (attr & 0x01) != 0;
-            let blink = (attr & 0x02) != 0;
-            this.display.setChar(row, column, ch, underline, blink);
-            column += 1;
-            if (column >= 40) {
-              column = 0;
-              row += 1;
-              if (row >= 2) {
-                row = 0;
-              }
-            }
-          }
+      var rest = data.slice(1).trim();
+
+      // console.log(`Handling message '${data}'`);
+
+      if (c == 'A') {
+        // console.log("handling analog value")
+        panel.handleAnalogValue(rest);
+      } else if (c == 'B') {
+        // console.log("handling button state")
+        panel.handleButtonState(rest);
+      } else if (c == 'D') {
+        // console.log("handling display data")
+        panel.handleDisplayData(rest);
+      } else if (c == 'L') {
+        // console.log("handling Light state")
+        panel.handleLightState(rest);
+      } else if (c == 'P') {
+        // console.log("handling blink Phase")
+        panel.handleBlinkPhase(rest);
+      } else if (c == 'I') {
+        // console.log("handling server information");
+        panel.handleServerInformation(rest);
+      } else if (c == 'M') {
+        // console.log("handling server message");
+        panel.handleServerMessage(rest);
+      }
+    };
+
+    this.socket.onclose = function(event) {
+      // console.log("closed: ", event);
+      panel.showMessage("Reconnecting to server ...");
+      panel.needRefresh = true;
+      // reconnect after 1 second
+      setTimeout(reconnect, 1000);
+    };
+
+    this.socket.onerror = function(event) {
+      console.log("web socket error: ", event);
+    };
+  }
+
+  my.Panel.prototype.addButton = function(x, y, w, h, label, labelPosition, value, color, multiPage, lightId) {
+    var that = this;
+    var button = new my.Button(x, y, w, h, label, labelPosition, value, color, multiPage, lightId);
+    this.haloContainer.appendChild(button.halo);
+
+    if (lightId >= 0) {
+      if (lightId >= this.lightButtons.length) {
+        this.lightButtons.length = lightId + 1;
+      }
+      this.lightButtons[lightId] = button;
+    }
+
+    this.mainContainer.appendChild(button.group);
+    this.buttons[value] = button;
+
+    button.onPress = function(b) {
+      that.onButtonPressed(b);
+    }
+    button.onRelease = function(b) {
+      that.onButtonReleased(b);
+    }
+
+    return button;
+  }
+
+  my.Panel.prototype.addSlider = function(x, y, w, h, channel, value) {
+    var that = this;
+    var slider = new my.Slider(x, y, w, h, channel, value);
+
+    this.mainContainer.appendChild(slider.group);
+    this.analogControls[channel] = slider;
+
+    slider.onValueChanged = function(s) {
+      that.onAnalogValueChanged(s);
+    }
+
+    return slider;
+  }
+
+  my.Panel.prototype.addButtonBelowDisplay = function(x, y, label, value, shade) {
+    return this.addButton(x, y, 6, 4, label, my.LabelPosition.BELOW, value, shade, false, -1);
+  }
+
+  my.Panel.prototype.addButtonWithLightBelowDisplay = function(x, y, label, value, shade, lightId) {
+    return this.addButton(x, y, 6, 4, label, my.LabelPosition.BELOW, value, shade, false, lightId);
+  }
+
+  my.Panel.prototype.addLargeButton = function(x, y, label, value, shade) {
+    return this.addButton(x, y, 6, 4, label, my.LabelPosition.ABOVE, value, shade, false, -1);
+  }
+
+  my.Panel.prototype.addLargeButtonWithLight = function(x, y, label, value, shade, lightId) {
+    return this.addButton(x, y, 6, 4, label, my.LabelPosition.ABOVE, value, shade, false, lightId);
+  }
+
+  my.Panel.prototype.addSmallButton = function(x, y, label, value, shade, multiPage) {
+    return this.addButton(x, y, 6, 2, label, my.LabelPosition.ABOVE, value, shade, multiPage, -1);
+  }
+
+  my.Panel.prototype.addIncDecButton = function(x, y, label, value, shade, multiPage) {
+    return this.addButton(x, y, 6, 2, label, my.LabelPosition.ABOVE_CENTERED, value, shade, multiPage, -1);
+  }
+
+  my.Panel.prototype.addControls = function(keyboard) {
+    // console.log("keyboard is '" + keyboard + "'");
+
+    // Normalize the keyboard string.
+    var hasSeq = false;
+    var hasBankSet = false;
+    keyboard = keyboard.toLowerCase();
+    if (keyboard.indexOf('sd') != -1) {
+      hasSeq = true;
+
+      if (keyboard.indexOf('1') != -1) {
+        hasBankSet = true;
+
+        if (keyboard.indexOf('32') != -1) {
+          keyboard = my.Keyboard.SD1_32;
+        } else {
+          keyboard = my.Keyboard.SD1;
         }
       } else {
-        console.log("Unknown display message '" + data + "'");
+        keyboard = my.Keyboard.VFX_SD;
       }
+    } else {
+      keyboard = my.Keyboard.VFX;
     }
 
-    my.Panel.prototype.handleLightState = function(data) {
-      var s = data.trim();
+    // console.log("normalized keyboard is '" + keyboard + "'");
+
+    var cartString = hasBankSet ? "BankSet" : "Cart";
+
+    this.addButtonWithLightBelowDisplay(10, 29, cartString, 52, my.Shade.LIGHT, 0xf);
+    this.addButtonWithLightBelowDisplay(16, 29, "Sounds",   53, my.Shade.LIGHT, 0xd);
+    this.addButtonWithLightBelowDisplay(22, 29, "Presets",  54, my.Shade.LIGHT, 0x7);
+    if (hasSeq) {
+      this.addButtonBelowDisplay     (28, 29, "Seq",      51, my.Shade.LIGHT);
+    }
+
+    this.addButtonWithLightBelowDisplay(42, 29, "0", 55, my.Shade.MEDIUM, 0xe);
+    this.addButtonWithLightBelowDisplay(48, 29, "1", 56, my.Shade.MEDIUM, 0x6);
+    this.addButtonWithLightBelowDisplay(54, 29, "2", 57, my.Shade.MEDIUM, 0x4);
+    this.addButtonWithLightBelowDisplay(60, 29, "3", 46, my.Shade.MEDIUM, 0xc);
+    this.addButtonWithLightBelowDisplay(66, 29, "4", 47, my.Shade.MEDIUM, 0x3);
+    this.addButtonWithLightBelowDisplay(72, 29, "5", 48, my.Shade.MEDIUM, 0xb);
+    this.addButtonWithLightBelowDisplay(78, 29, "6", 49, my.Shade.MEDIUM, 0x2);
+    this.addButtonWithLightBelowDisplay(84, 29, "7", 35, my.Shade.MEDIUM, 0xa);
+    this.addButtonWithLightBelowDisplay(90, 29, "8", 34, my.Shade.MEDIUM, 0x1);
+    this.addButtonWithLightBelowDisplay(96, 29, "9", 25, my.Shade.MEDIUM, 0x9);
+
+    // Large buttons on the main panel part
+    this.addLargeButton         (108, 29, "Replace\nProgram", 29, my.Shade.MEDIUM);
+    this.addLargeButtonWithLight(114, 29, "1-6",              30, my.Shade.MEDIUM, 0x0);
+    this.addLargeButtonWithLight(120, 29, "7-12",             31, my.Shade.MEDIUM, 0x8);
+
+    this.addLargeButton         (154, 29, "Select\nVoice", 5, my.Shade.MEDIUM);
+    this.addLargeButton         (160, 29, "Copy",          9, my.Shade.MEDIUM);
+    this.addLargeButton         (166, 29, "Write",         3, my.Shade.MEDIUM);
+    this.addLargeButtonWithLight(172, 29, "Compare",       8, my.Shade.MEDIUM, 0x5);
+
+    // Small buttons, main panel
+    // -- Performance:
+    this.addSmallButton(108, 20, "Patch\nSelect",   26, my.Shade.DARK, true);
+    this.addSmallButton(114, 20, "MIDI",            27, my.Shade.DARK, true);
+    this.addSmallButton(120, 20, "Effects",         28, my.Shade.DARK, true);
+
+    this.addSmallButton(108, 13, "Key\nZone",       39, my.Shade.DARK, false);
+    this.addSmallButton(114, 13, "Trans-\npose",    40, my.Shade.DARK, false);
+    this.addSmallButton(120, 13, "Release",         41, my.Shade.DARK, false);
+
+    this.addSmallButton(108,  6, "Volume",          36, my.Shade.DARK, false);
+    this.addSmallButton(114,  6, "Pan",             37, my.Shade.DARK, false);
+    this.addSmallButton(120,  6, "Timbre",          38, my.Shade.DARK, false);
+
+    // Sequencer / System, both large and small buttons:
+    if (hasSeq) {
+      // The 'Master', 'Storage' and 'MIDI Control' buttons are small & at the to,
+      // the sequencer buttons are big and at the bottom.
+      this.addLargeButton(131, 29, "Rec",           19, my.Shade.MEDIUM);
+      this.addLargeButton(137, 29, "Stop\n/Cont",   22, my.Shade.MEDIUM);
+      this.addLargeButton(143, 29, "Play",          23, my.Shade.MEDIUM);
+
+      this.addSmallButton(131, 20, "Click",         32, my.Shade.DARK, false);
+      this.addSmallButton(137, 20, "Seq\nControl",  18, my.Shade.DARK, true);
+      this.addSmallButton(143, 20, "Locate",        33, my.Shade.DARK, true);
+
+      this.addSmallButton(131, 13, "Song",          60, my.Shade.DARK, false);
+      this.addSmallButton(137, 13, "Seq",           59, my.Shade.DARK, false);
+      this.addSmallButton(143, 13, "Track",         61, my.Shade.DARK, false);
+
+      this.addSmallButton(131,  6, "Master",        20, my.Shade.LIGHT, true);
+      this.addSmallButton(137,  6, "Storage",       21, my.Shade.LIGHT, false);
+      this.addSmallButton(143,  6, "MIDI\nControl", 24, my.Shade.LIGHT, true);
+    } else {
+      // The 'Master', 'Storage' and 'MIDI Control' buttons are large & at the bottom,
+      // and there are no sequencer buttons
+      this.addLargeButton(131, 29, "Master",        20, my.Shade.LIGHT, true);
+      this.addLargeButton(137, 29, "Storage",       21, my.Shade.LIGHT, false);
+      this.addLargeButton(143, 29, "MIDI\nControl", 24, my.Shade.LIGHT, true);
+    }
+
+    // -- Programming:
+    this.addSmallButton(154, 20, "Wave",             4, my.Shade.DARK, false);
+    this.addSmallButton(160, 20, "Mod\nMixer",       6, my.Shade.DARK, false);
+    this.addSmallButton(166, 20, "Program\nControl", 2, my.Shade.DARK, false);
+    this.addSmallButton(172, 20, "Effects",          7, my.Shade.DARK, true);
+
+    this.addSmallButton(154, 13, "Pitch",           11, my.Shade.DARK, false);
+    this.addSmallButton(160, 13, "Pitch\nMod",      13, my.Shade.DARK, false);
+    this.addSmallButton(166, 13, "Filters",         15, my.Shade.DARK, true);
+    this.addSmallButton(172, 13, "Output",          17, my.Shade.DARK, true);
+
+    this.addSmallButton(154,  6, "LFO",             10, my.Shade.DARK, true);
+    this.addSmallButton(160,  6, "Env1",            12, my.Shade.DARK, true);
+    this.addSmallButton(166,  6, "Env2",            14, my.Shade.DARK, true);
+    this.addSmallButton(172,  6, "Env3",            16, my.Shade.DARK, true);
+
+    // Display buttons - approximate:
+    this.addSmallButton(32, 21, "", 50, my.Shade.DARK, false);
+    this.addSmallButton(57, 21, "", 44, my.Shade.DARK, false);
+    this.addSmallButton(82, 21, "", 45, my.Shade.DARK, false);
+
+    this.addSmallButton(32,  4, "", 58, my.Shade.DARK, false);
+    this.addSmallButton(57,  4, "", 42, my.Shade.DARK, false);
+    this.addSmallButton(82,  4, "", 43, my.Shade.DARK, false);
+
+    // Value slider
+    var valueSlider = this.addSlider(-2.75, 4, 7, 22, 3, 0.7);
+
+    // Increment and Decrement
+    this.addIncDecButton(-12.5, 22, "\u25BC", 63, my.Shade.DARK, false);
+    this.addIncDecButton(-12.5, 12, "\u25B2", 62, my.Shade.DARK, false);
+
+    // Volume slider
+    var volumeSlider = this.addSlider(-30, 4, 7, 22, 5, 1.0);
+
+    for (var i = 1; i < this.buttons.length; i++) {
+      var button = this.buttons[i];
+      if (button != null) {
+        this.rect = this.rect.union(button.rect);
+      }
+    }
+    this.rect = this.rect.union(valueSlider.rect);
+    this.rect = this.rect.union(volumeSlider.rect);
+
+    this.rect = this.rect.outset(2, 2);
+
+    this.container.setAttribute("viewBox", this.rect.viewBox());
+  }
+
+  my.Panel.prototype.sendString = function(s) {
+    if (this.socket != undefined && this.socket.readyState == WebSocket.OPEN) {
+      // console.log(`Sending '${s}'`);
+      this.socket.send(s);
+    }
+  }
+
+  my.Panel.prototype.onButtonPressed = function(button) {
+    this.sendString("BD " + button.value);
+  }
+
+  my.Panel.prototype.onButtonReleased = function(button) {
+    this.sendString("BU " + button.value);
+  }
+
+  my.Panel.prototype.onAnalogValueChanged = function(slider) {
+    // 0.05 == 0; 0.95 == 760
+    var value = (slider.value - 0.05) / 0.9;
+    value = 760 * value;
+    value = Math.round(Math.max(0, Math.min(1023, value)));
+    var s = "A " + slider.channel + " " + value;
+
+    console.log(`sending analog value: ${s}`);
+    this.sendString(s);
+  }
+
+  my.Panel.prototype.handleDisplayData = function(data) {
+    var c = data[0];
+    if (c == 'X') {
+      // Clear the screen
+      // console.log("Clearing the screen");
+      this.display.clear();
+    } else if (c == 'C') {
+      // Character data
+      var s = data.slice(1).trim();
+      // console.log(`Displaying characters: '${s}'`);
       var parts = s.split(" ");
-      if ((parts.length % 2) == 0) {
-        for (i = 0; i < parts.length; i+= 2) {
-          let whichLight = parseInt(parts[i]);
-          let state = parseInt(parts[i+1]);
-          var button = this.lightButtons[whichLight];
-          if (button != null && button instanceof my.Button) {
-            if (state == 2) {
-              button.setLight(my.Light.ON);
-            } else if (state == 3) {
-              button.setLight(my.Light.BLINK);
-            } else {
-              button.setLight(my.Light.OFF);
+      // console.log(`Have ${parts.length} parts`);
+      if (parts.length >= 2) {
+        let row = parseInt(parts[0]);
+        let column = parseInt(parts[1]);
+        // console.log(`Starting at ${row},${column}`);
+        for (i = 2; i < parts.length - 1; i+= 2) {
+          let ch = parseInt(parts[i], 16);
+          let attr = parseInt(parts[i+1], 16);
+          let underline = (attr & 0x01) != 0;
+          let blink = (attr & 0x02) != 0;
+          this.display.setChar(row, column, ch, underline, blink);
+          column += 1;
+          if (column >= 40) {
+            column = 0;
+            row += 1;
+            if (row >= 2) {
+              row = 0;
             }
           }
         }
       }
+    } else {
+      console.log("Unknown display message '" + data + "'");
     }
+  }
 
-    my.Panel.prototype.handleBlinkPhase = function(data) {
-      var s = data.trim();
-      let phase = parseInt(s);
-      this.setBlinkPhase(phase);
-    }
-
-    my.Panel.prototype.handleAnalogValue = function(data) {
-      var s = data.trim();
-      // console.log("Handling analog value: '" + s + "'");
-      var parts = s.split(" ");
-      if ((parts.length % 2) == 0) {
-        for (i = 0; i < parts.length - 1; i += 2) {
-          var channel = parseInt(parts[i]);
-          var value = parseInt(parts[1+1]);
-
-          var analogControl = this.analogControls[channel];
-          if (analogControl != null) {
-            if (analogControl instanceof my.Slider) {
-              // 0.05 == 0; 0.95 == 760
-              value = value / 760.0;
-              value = 0.05 + 0.9 * value;
-              analogControl.setValue(value);
-            }
-          }
-        }
-      }
-    }
-
-    my.Panel.prototype.handleButtonState = function(data) {
-      var s = data.trim();
-      var pressed = s[0] == 'D';
-
-      var parts = s.substring(1).trim().split(" ");
-      for (i = 0; i < parts.length; i++) {
-        var number = parseInt(parts[i]);
-        var button = this.buttons[number];
+  my.Panel.prototype.handleLightState = function(data) {
+    var s = data.trim();
+    var parts = s.split(" ");
+    if ((parts.length % 2) == 0) {
+      for (i = 0; i < parts.length; i+= 2) {
+        let whichLight = parseInt(parts[i]);
+        let state = parseInt(parts[i+1]);
+        var button = this.lightButtons[whichLight];
         if (button != null && button instanceof my.Button) {
-          button.showPressed(pressed);
+          if (state == 2) {
+            button.setLight(my.Light.ON);
+          } else if (state == 3) {
+            button.setLight(my.Light.BLINK);
+          } else {
+            button.setLight(my.Light.OFF);
+          }
         }
       }
     }
+  }
 
-    my.Panel.prototype.handleServerInformation = function(data) {
-      var s = data.trim();
-      if (s == "") return;
+  my.Panel.prototype.handleBlinkPhase = function(data) {
+    var s = data.trim();
+    let phase = parseInt(s);
+    this.setBlinkPhase(phase);
+  }
 
-      var parts = s.split(",");
-      if (parts.length != 2) return;
+  my.Panel.prototype.handleAnalogValue = function(data) {
+    var s = data.trim();
+    console.log("Handling analog value: '" + s + "'");
+    var parts = s.split(" ");
+    if ((parts.length % 2) == 0) {
+      for (i = 0; i < parts.length - 1; i += 2) {
+        var channel = parseInt(parts[i]);
+        var value = parseInt(parts[i+1]);
 
-      var keyboard = parts[0];
-      var version = parseInt(parts[1]);
-      // console.log(`Server information message '${s}' -> keyboard '${keyboard}' version '${version}'`);
-      if (keyboard == this.keyboard && version == this.version) {
-        // console.log(`needRefresh = ${this.needRefresh}`);
-        // same keyboard type version - proceed!
-        if (this.needRefresh) {
-          // console.log("Requesting refresh");
-          this.sendString("CA1B1L1D1"); // Send me analog data, buttons, and display data
-          this.needRefresh = false; // presuming the refresh succeeds
+        var analogControl = this.analogControls[channel];
+        if (analogControl != null) {
+          if (analogControl instanceof my.Slider) {
+            // 0.05 == 0; 0.95 == 760
+            let position = value / 760.0;
+            position = 0.05 + 0.9 * position;
+            console.log(`Setting channel ${channel} value ${value} => position ${position}`);
+            analogControl.setValue(position);
+          }
         }
-      } else {
-        // we need to reload, forcing a refresh from the server.
-        // console.log(`keyboard '${keyboard}' vs '${this.keyboard}', version '${version}' vs '${this.version}', would reload`);
-
-        // For debugging purposes:
-        // If this goes into a loop of reloading over and over,
-        // increasing reload_timeout may let you catch the javascript console log
-        // (which gets cleared by reloading the page).
-        const reload_timeout = 0;
-        setTimeout(function() { document.location.reload(true); }, reload_timeout); // immediately reload
       }
     }
+  }
 
-    my.Panel.prototype.handleServerMessage = function(data) {
-      // console.log(`Handling server message: '${data}'`);
-      this.showMessage(data);
+  my.Panel.prototype.handleButtonState = function(data) {
+    var s = data.trim();
+    var pressed = s[0] == 'D';
+
+    var parts = s.substring(1).trim().split(" ");
+    for (i = 0; i < parts.length; i++) {
+      var number = parseInt(parts[i]);
+      var button = this.buttons[number];
+      if (button != null && button instanceof my.Button) {
+        button.showPressed(pressed);
+      }
     }
+  }
 
-    return my;
-  })();
+  my.Panel.prototype.handleServerInformation = function(data) {
+    var s = data.trim();
+    if (s == "") return;
+
+    var parts = s.split(",");
+    if (parts.length != 2) return;
+
+    var keyboard = parts[0];
+    var version = parseInt(parts[1]);
+    // console.log(`Server information message '${s}' -> keyboard '${keyboard}' version '${version}'`);
+    if (keyboard == this.keyboard && version == this.version) {
+      // console.log(`needRefresh = ${this.needRefresh}`);
+      // same keyboard type version - proceed!
+      if (this.needRefresh) {
+        // console.log("Requesting refresh");
+        this.sendString("CA1B1L1D1"); // Send me analog data, buttons, and display data
+        this.needRefresh = false; // presuming the refresh succeeds
+      }
+    } else {
+      // we need to reload, forcing a refresh from the server.
+      // console.log(`keyboard '${keyboard}' vs '${this.keyboard}', version '${version}' vs '${this.version}', would reload`);
+
+      // For debugging purposes:
+      // If this goes into a loop of reloading over and over,
+      // increasing reload_timeout may let you catch the javascript console log
+      // (which gets cleared by reloading the page).
+      const reload_timeout = 0;
+      setTimeout(function() { document.location.reload(true); }, reload_timeout); // immediately reload
+    }
+  }
+
+  my.Panel.prototype.handleServerMessage = function(data) {
+    // console.log(`Handling server message: '${data}'`);
+    this.showMessage(data);
+  }
+
+  return my;
+})();
   
