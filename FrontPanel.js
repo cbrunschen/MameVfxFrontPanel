@@ -421,7 +421,8 @@ var fp = (function() {
     e.setAttribute('height', `${this.h}`);
   }
 
-  my.displayRect = new my.Rect(15, 7, 82, 13);
+  my.displayRect = new my.Rect(15, 6.5, 82, 12);
+  my.displayGlassRect = new my.Rect(10, -2, 92, 27);
 
   my.Button = function(x, y, w, h, label, labelPosition, value, color, multiPage, lightId) {
     var that = this;
@@ -758,6 +759,18 @@ var fp = (function() {
     this.container.setAttribute("height", "375");
     this.container.setAttribute("overflow", "scroll");
 
+    this.background = my.createElement("rect");
+    this.background.setAttribute("width", "100%");
+    this.background.setAttribute("height", "100%");
+    this.background.setAttribute("fill", "#181818");
+    this.container.appendChild(this.background);
+
+    this.displayGlass = my.displayGlassRect.toPath();
+    this.displayGlass.setAttribute("fill", "#000000");
+    this.container.appendChild(this.displayGlass);
+
+    this.rect = my.displayGlassRect;
+
     this.haloContainer = my.createElement("g");
     this.container.appendChild(this.haloContainer);
 
@@ -772,7 +785,6 @@ var fp = (function() {
     this.displayContainer.setAttribute("width", my.displayRect.w);
     this.displayContainer.setAttribute("height", my.displayRect.h);
     this.container.appendChild(this.displayContainer);
-    this.rect = my.displayRect;
 
     this.buttons = new Array();
     this.lightButtons = new Array();
@@ -1080,19 +1092,19 @@ var fp = (function() {
     this.addSmallButton(57, 21, "", 44, my.Shade.DARK, false);
     this.addSmallButton(82, 21, "", 45, my.Shade.DARK, false);
 
-    this.addSmallButton(32,  4, "", 58, my.Shade.DARK, false);
-    this.addSmallButton(57,  4, "", 42, my.Shade.DARK, false);
-    this.addSmallButton(82,  4, "", 43, my.Shade.DARK, false);
+    this.addSmallButton(32,  0, "", 58, my.Shade.DARK, false);
+    this.addSmallButton(57,  0, "", 42, my.Shade.DARK, false);
+    this.addSmallButton(82,  0, "", 43, my.Shade.DARK, false);
 
     // Value slider
-    var valueSlider = this.addSlider(-2.75, 4, 7, 22, 3, 0.7);
+    var valueSlider = this.addSlider(-8, 2, 8, 24, 3, 0.7);
 
     // Increment and Decrement
-    this.addIncDecButton(-12.5, 22, "\u25BC", 63, my.Shade.DARK, false);
-    this.addIncDecButton(-12.5, 12, "\u25B2", 62, my.Shade.DARK, false);
+    this.addIncDecButton(-17, 22, "\u25BC", 63, my.Shade.DARK, false);
+    this.addIncDecButton(-17, 12, "\u25B2", 62, my.Shade.DARK, false);
 
     // Volume slider
-    var volumeSlider = this.addSlider(-30, 4, 7, 22, 5, 1.0);
+    var volumeSlider = this.addSlider(-34, 2, 8, 24, 5, 1.0);
 
     for (var i = 1; i < this.buttons.length; i++) {
       var button = this.buttons[i];
@@ -1106,6 +1118,10 @@ var fp = (function() {
     this.rect = this.rect.outset(2, 2);
 
     this.container.setAttribute("viewBox", this.rect.viewBox());
+    this.background.setAttribute("x", this.rect.x);
+    this.background.setAttribute("y", this.rect.y);
+    this.background.setAttribute("width", this.rect.w);
+    this.background.setAttribute("height", this.rect.h);
   }
 
   my.Panel.prototype.sendString = function(s) {

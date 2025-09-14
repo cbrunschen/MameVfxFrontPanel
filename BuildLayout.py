@@ -3,6 +3,164 @@
 from textwrap import indent, dedent, wrap
 from dataclasses import dataclass, field
 import re
+import sys
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+slider_library = '''\
+-----------------------------------------------------------------------
+-- Slider library starts.
+-- Can be copied as-is to other layouts.
+-----------------------------------------------------------------------
+local sliders = {}   -- Stores slider information.
+local pointers = {}  -- Tracks pointer state.
+
+-- The knob's Y position must be animated using <animate inputtag="{port_name}">.
+-- The click area's vertical size must exactly span the range of the
+-- knob's movement.
+function add_vertical_slider(view, clickarea_id, knob_id, port_name)
+  local slider = {}
+
+  slider.clickarea = view.items[clickarea_id]
+  if slider.clickarea == nil then
+    emu.print_error("Slider element: '" .. clickarea_id .. "' not found.")
+    return
+  end
+
+  slider.knob = view.items[knob_id]
+  if slider.knob == nil then
+    emu.print_error("Slider knob element: '" .. knob_id .. "' not found.")
+    return
+  end
+
+  local port = file.device:ioport(port_name)
+  if port == nil then
+    emu.print_error("Port: '" .. port_name .. "' not found.")
+    return
+  end
+
+  slider.field = nil
+  for k, val in pairs(port.fields) do
+    slider.field = val
+    break
+  end
+  if slider.field == nil then
+    emu.print_error("Port: '" .. port_name .."' does not seem to be an IPT_ADJUSTER.")
+    return
+  end
+
+  table.insert(sliders, slider)
+end
+
+local function pointer_updated(type, id, dev, x, y, btn, dn, up, cnt)
+  -- If a button is not pressed, reset the state of the current pointer.
+  if btn & 1 == 0 then
+    pointers[id] = nil
+    return
+  end
+
+  -- If a button was just pressed, find the affected slider, if any.
+  if dn & 1 ~= 0 then
+    for i = 1, #sliders do
+      if sliders[i].knob.bounds:includes(x, y) then
+        pointers[id] = {
+          selected_slider = i,
+          relative = true,
+          start_y = y,
+          start_value = sliders[i].field.user_value }
+        break
+      elseif sliders[i].clickarea.bounds:includes(x, y) then
+        pointers[id] = {
+          selected_slider = i,
+          relative = false }
+        break
+      end
+    end
+  end
+
+  -- If there is no slider selected by the current pointer, we are done.
+  if pointers[id] == nil then
+    return
+  end
+
+  -- A slider is selected. Update state and, indirectly, slider knob position,
+  -- based on the pointer's Y position. It is assumed the attached IO field is
+  -- an IPT_ADJUSTER with a range of 0-100 (the default).
+
+  local pointer = pointers[id]
+  local slider = sliders[pointer.selected_slider]
+
+  local knob_half_height = slider.knob.bounds.height / 2
+  local min_y = slider.clickarea.bounds.y0 + knob_half_height
+  local max_y = slider.clickarea.bounds.y1 - knob_half_height
+
+  local new_value = 0
+  if pointer.relative then
+    -- User clicked on the knob. The new value will depend on how much the
+    -- knob was dragged.
+    new_value = pointer.start_value - 100 * (y - pointer.start_y) / (max_y - min_y)
+  else
+    -- User clicked elsewhere on the slider. The new value will depend on
+    -- the absolute position of the click.
+    new_value = 100 - 100 * (y - min_y) / (max_y - min_y)
+  end
+
+  new_value = math.floor(new_value + 0.5)
+  if new_value < 0 then new_value = 0 end
+  if new_value > 100 then new_value = 100 end
+  slider.field.user_value = new_value
+end
+
+local function pointer_left(type, id, dev, x, y, up, cnt)
+  pointers[id] = nil
+end
+
+local function pointer_aborted(type, id, dev, x, y, up, cnt)
+  pointers[id] = nil
+end
+
+local function forget_pointers()
+  pointers = {}
+end
+
+function install_slider_callbacks(view)
+  view:set_pointer_updated_callback(pointer_updated)
+  view:set_pointer_left_callback(pointer_left)
+  view:set_pointer_aborted_callback(pointer_aborted)
+  view:set_forget_pointers_callback(forget_pointers)
+end
+-----------------------------------------------------------------------
+-- Slider library ends.
+-----------------------------------------------------------------------
+'''
+
+script_main = '''\
+-- file is the layout file object
+-- set a function to call after resolving tags
+file:set_resolve_tags_callback(
+  function ()
+    -- file.device is the device that caused the layout to be loaded
+    -- in this case, it's the esqpanel2x40_vfx object.
+
+    for view_name, view in pairs(file.views) do
+      install_slider_callbacks(view)
+
+      add_vertical_slider(view, "slider_volume", "slider_knob_volume", "analog_volume")
+      add_vertical_slider(view, "slider_data_entry", "slider_knob_data_entry", "analog_data_entry")
+
+      -- TODO: Display a warning about how to enable sliders
+      -- view.items["warning"]:set_state(0)
+    end
+  end
+)
+'''
+
+def to_id(s):
+  """Merge multiple lines (trimming hyphenation),
+     then replace non-identifier characters with '_',
+     finally case-fold."""
+  return re.sub(r'[^a-zA-Z0-9]+', '_', s.replace('-\n','')).casefold()
 
 @dataclass
 class Document:
@@ -48,7 +206,7 @@ class CDATA:
   def __str__(self):
     parts = self.contents.split(']]>')
     escaped = ']]>]]><[CDATA['.join(parts)
-    return f'<[CDATA[\n{indent(escaped, '  ')}\n]]>'
+    return f'<![CDATA[\n{indent(escaped, '  ')}\n]]>'
 
 @dataclass
 class Space:
@@ -63,7 +221,7 @@ class Comment:
   contents: str
 
   def __str__(self):
-    return f'<-- {self.contents.replace("--", "==")} -->\n'
+    return f'<!-- {self.contents.replace("--", "==")} -->\n'
 
 def clean(d: dict[str, str]) -> dict[str, str]:
   return { k : v for (k, v) in d.items() if v != None }
@@ -99,15 +257,27 @@ class Rect:
   def offset(self, dx, dy):
     return Rect(self.x+dx, self.y+dy, self.w, self.h)
   
-  def toPath(self, r=None):
+  def toPath(self, r=None, fill=None, stroke=None):
     rx = f"{r:.3g}" if r != None else None
     return Element('rect', clean({
       'x': f"{self.x:.3g}", 
       'y': f"{self.y:.3g}", 
       'width': f"{self.w:.3g}", 
-      'height': f"{self.h:.3g}", 
-      'rx': rx
+      'height': f"{self.h:.3g}",
+      'rx': rx,
+      'fill': fill,
+      'stroke': stroke,
     }), [])
+  
+  def toElement(self, color=None):
+    return Element('rect', clean({
+      'x': f"{self.x:.3g}", 
+      'y': f"{self.y:.3g}", 
+      'width': f"{self.w:.3g}", 
+      'height': f"{self.h:.3g}",
+    }), [
+
+    ])
 
   
   def getX(self, d):
@@ -119,13 +289,14 @@ class Rect:
   def viewBox(self):
     return f"{self.x} {self.y} {self.w} {self.h}"
   
-  def toBounds(self):
-    return Element('bounds', {
+  def toBounds(self, state=None):
+    return Element('bounds', clean({
       'x': f"{self.x:.5g}", 
       'y': f"{self.y:.5g}", 
       'width': f"{self.w:.5g}", 
-      'height':f"{self.h:.5g}"
-      }, [])
+      'height':f"{self.h:.5g}",
+      'state':state,
+      }), [])
 
   def fitWithin(self, enclosing):
     xscale = enclosing.w / self.w
@@ -178,13 +349,14 @@ SHADE_LIGHT = ('light', "#bbbbbb", "#ffffff")
 SHADE_MEDIUM = ('medium', "#777777", "#ffffff")
 SHADE_DARK = ('dark', "#333333", '#ffffff')
 
-fontSize = 1.4
+buttonLabelFontSize = 1.8
 
-roughDisplayRect = Rect(15, 7, 82, 13)
+roughDisplayRect = Rect(15, 6.5, 82, 12)
 charRect = Rect(0, 0, 342, 572)
 charsRect = Rect(0, 0, 40 * charRect.w, 2 * charRect.h)
 displayRect = charsRect.fitWithin(roughDisplayRect)
 
+displayGlassRect = Rect(10, -2, 92, 27)
 
 def rgb_components(rgb):
   return [int(c, 16) / 255.0 for c in wrap(rgb.removeprefix('#'), 2)]
@@ -192,50 +364,50 @@ def rgb_components(rgb):
 @dataclass
 class Condition:
   name: str
+  source: str
   mask: int
   state: bool
 
   def opposite(self):
-    return Condition(self.name, self.mask, not self.state)
-
-@dataclass
-class ConditionalLabel:
-  label: str
-  condition: Condition
+    return Condition(self.name, self.source, self.mask, not self.state)
 
 class Panel:
   def __init__(self):
-    self.rect = roughDisplayRect
+    self.rect = displayGlassRect
 
     self.button_shapes = {}
     self.text_definitions = {}
-    self.light_definitions = [
-      Element('element', {}, [
-        Element('rect', {
-          'state': '0',
-          'statemask': '~lightmask~',
-        }, [
-          self.layout_color("#112211")
-        ]),
+    self.light_definitions = []
 
-        Element('rect', {
-          'state': '~lightmask~',
-          'statemask': '~lightmask~',
-        }, [
-          self.layout_color("#22ff22")        
-        ]),
-      ])
-    ]
+    knobTop    = Rect(0, 0,    6.5, 4).offset(0.75, 0.75)
+    knobBottom = Rect(0, 18.5, 6.5, 4).offset(0.75, 0.75)
+
     self.slider_definitions = [
-      # Initially just an empty grey rectangle
-      Element('element', {
-        'name': 'slider'
-      }, [
-        Element('rect', {}, [
-          self.layout_color("#333333")
-        ])
-      ])
+      self.layout_element(name="invisible_rect", contents=[
+        self.layout_rect(color="#00000000"),
+      ]),
+      self.layout_element(name='slider_frame', contents=[
+        self.layout_rect(color="#333333", bounds=Rect(0, 0, 8, 24)),
+        self.layout_rect(color="#000000", bounds=Rect(0.5, 0.5, 7, 23))
+      ]),
+      self.layout_element(name="slider_knob", contents=[
+        self.layout_rect(color="#333333", bounds=knobTop),
+        self.layout_rect(color="#444444", bounds=Rect(0, 0,    6.5, 0.75).offset(0.75, 0.75)),
+        self.layout_rect(color="#222222", bounds=Rect(0, 1.75, 6.5, 0.25).offset(0.75, 0.75)),
+        self.layout_rect(color="#444444", bounds=Rect(0, 2,    6.5, 0.25).offset(0.75, 0.75)),
+        self.layout_rect(color="#222222", bounds=Rect(0, 3.25, 6.5, 0.75).offset(0.75, 0.75)),
+      ]),
+      self.layout_group(name="slider", contents=[
+        self.layout_element(ref="slider_frame", bounds=Rect(0, 0, 8, 24)),
+        self.layout_element(id="slider_~slider_id~", ref="invisible_rect", bounds=Rect(0.75, 0.75, 7, 19.5)),
+        self.layout_element(ref="slider_knob", id="slider_knob_~slider_id~", contents=[
+          self.layout_tag('animate', inputtag="~port_name~", inputmask="0x3ff"),
+          self.layout_bounds(knobTop, state="100"),
+          self.layout_bounds(knobBottom, state="0"),
+        ]),
+      ]),
     ]
+
     self.vfd_definitions = [
       dedent('''\
   <!-- The VFD elements -->
@@ -297,8 +469,12 @@ class Panel:
         'name': 'background'
       }, [
         Element('rect', {}, [
-          self.layout_color("#000000")
+          self.layout_color("#222222")
         ])
+      ]),
+
+      self.layout_element(name='display_glass', contents=[
+        self.layout_rect(color="#000000", bounds=displayGlassRect)
       ])
     ]
 
@@ -306,19 +482,23 @@ class Panel:
     self.text_uses = []
     self.light_uses = []
     self.slider_uses = []
-    self.decoration_uses = []
+    self.decoration_uses = [
+      self.layout_element(ref='display_glass', bounds=displayGlassRect)
+    ]
     self.vfd_uses = [
       dedent(f'''\
-    <group ref="vfd">
-      {displayRect.toBounds()}
-    </group>
-''')
+      <group ref="vfd">
+        {displayRect.toBounds()}
+      </group>
+      ''')
     ]
+
+    self.show_if = []
 
     self.view = []
   
-  def layout_bounds(self, bounds):
-    return bounds.toBounds()
+  def layout_bounds(self, bounds, state=None):
+    return bounds.toBounds(state)
 
   def layout_color(self, rgb):
     comps = rgb_components(rgb)
@@ -329,11 +509,12 @@ class Panel:
       []
     )
   
-  def layout_tag(self, tag, contents=None, bounds=None, color=None, name=None, ref=None, **kwargs):
+  def layout_tag(self, tag, contents=None, bounds=None, color=None, name=None, ref=None, id=None, **kwargs):
     e = Element(tag, clean({
       **kwargs,
       'name': name,
-      'ref': ref
+      'ref': ref,
+      'id': id,
     }), [])
 
     if (bounds != None):
@@ -357,14 +538,17 @@ class Panel:
   def layout_group(self, **kwargs):
     return self.layout_tag('group', **kwargs)
 
-  def layout_rect(self, name=None, color=None, state=None, statemask=None):
+  def layout_rect(self, name=None, ref=None, color=None, state=None, statemask=None, bounds=None):
     e = Element('rect', clean({
       'name': name,
+      'ref': ref,
       'state': state,
       'statemask': statemask
     }), [])
     if (color != None):
       e.append(self.layout_color(color))
+    if bounds != None:
+      e.append(self.layout_bounds(bounds))
     return e
   
   def layout_svg_image(self, svg, name=None, color=None, state=None, statemask=None):
@@ -375,31 +559,73 @@ class Panel:
     }), [])
     if color != None:
       e.append(self.layout_color(color))
-    e.append(CDATA(svg))
+    data = Element('data');
+    data.append(CDATA(svg))
+    e.append(data)
     return e
 
-  def layout_text(self, s, name=None, color=None, state=None, statemask=None, align=None):
+  def layout_text(self, s, name=None, color=None, align=None, attr={}):
     e = Element('text', clean({
+      **attr,
       'string': s,
       'name': name,
-      'state': state,
-      'statemask': statemask,
       'align': align
     }), [])
     if color != None:
       e.append(self.layoutColor(color))
     return e
 
+  def addLabel(self, x, y, w, fontSize, label, centered = False, condition = None, suffix = '', hidden = False):      
+    bounds = Rect(x, y, w, fontSize)
+    self.rect = self.rect.union(bounds)
+
+    align = "0" if centered else "1"
+    alignment = "C" if centered else "L"
+    condition_suffix = f'__C_{condition.name}_{condition.state}' if condition else ''
+
+    id = f'{to_id(label)}_{alignment}{condition_suffix}{suffix}'
+
+    defattr = {}
+    useattr = {}
+
+    if condition:
+      defattr['statemask'] = condition.mask
+      defattr['state'] = condition.mask if condition.state else "0"
+    elif hidden:
+      defattr['state'] = '1'
+      defattr['defstate'] = '0'
+      useattr['id'] = f'label_{id}'
+
+    if id not in self.text_definitions:
+      self.text_definitions[id] = self.layout_element(
+        contents=self.layout_text(
+          label,
+          align=align,
+          attr=defattr
+        ), 
+        name=f'text_{id}')
+    
+    self.text_uses.append(
+      self.layout_element(
+        ref=f'text_{id}',
+        bounds=bounds,
+        name=condition.source if condition else None,
+        **useattr
+        ))
+
   def addButton(self, x, y, w, h, label, labelPosition, value, shade, multiPage = False, lightId = None, condition = None):
     bounds = Rect(x, y, w, h)
     self.rect = self.rect.union(bounds)
 
+    condition_suffix = f'__C_{condition.name}_{condition.state}' if condition else ''
+
     # Ensure that there's a reusable button shape
     (shade_name, rgb_default, rgb_pressed) = shade
-    shape_name = f'button_{w}_{h}_{shade_name}'
+    shape_name = f'button_{w}_{h}_{shade_name}{condition_suffix}'
+
     if shape_name not in self.button_shapes:
       rect = Rect(0, 0, w, h).inset(0.1, 0.1)
-      svg = f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{str(rect.toPath()).rstrip()}</svg>'
+      svg = f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{str(rect.toPath(r=0.5, fill="white")).rstrip()}</svg>'
       definition = self.layout_element(contents=[
         self.layout_svg_image(svg, state="0", color=rgb_default),
         self.layout_svg_image(svg, state="1", color=rgb_pressed)
@@ -410,80 +636,50 @@ class Panel:
     mask = 1 << (value % 32)
     inputmask = f'0x{mask:08x}'
 
-    if condition != None:
-      self.button_uses.append(
-        self.layout_element(
-          bounds=bounds,
-          inputtag=inputtag, inputmask=inputmask,
-          name=condition.name, statemask=condition.mask, state=condition.mask if condition.state else 0
-        )
-      )
-    else:
-      self.button_uses.append(
-        self.layout_element(
-          bounds=bounds,
-          inputtag=inputtag, inputmask=inputmask
-        )
-      )
+    button_id = f'button_{value}_{to_id(label)}{condition_suffix}'
 
-    def placeLabel(label, condition=None):
+    self.button_uses.append(
+      self.layout_element(
+        ref=shape_name,
+        id=button_id,
+        bounds=bounds,
+        inputtag=inputtag, inputmask=inputmask,
+      )
+    )
+
+    if condition:
+      self.show_if.append((button_id, condition.name, condition.state))
+
+    if not label.startswith("#"):
       labelLines = label.split("\n")
       nLines = len(labelLines)
-      y0 = (1 - nLines) * fontSize
-      align = None if ((labelPosition & CENTERED) != 0) else "1"
-      if labelPosition == ABOVE:
-        y0 = (1 - nLines) * fontSize - 0.3
-      if labelPosition == BELOW:
-        y0 = h + fontSize - 0.3
+      y0 = h if labelPosition == BELOW else -nLines * buttonLabelFontSize
+      centered = ((labelPosition & CENTERED) != 0)
       
       for i in range(nLines):
         line = labelLines[i]
-        id = re.sub(r'[^a-zA-Z0-9]+', '_', line).casefold()
-        if align is not None:
-          id = f'{id}__leftaligned'
-
-        textBounds = Rect(x, y + y0 + i * fontSize, w, fontSize)
-        if id not in self.text_definitions:
-          self.text_definitions[id] = self.layout_element(
-            contents=self.layout_text(
-              labelLines[i],
-              align=align
-            ), 
-            name=f'text_{id}')
-        
-        self.text_uses.append(
-          self.layout_element(
-            ref=f'text_{id}',
-            bounds=textBounds,
-            name=condition.name if condition else None, 
-            statemask=condition.mask if condition else None, 
-            state=(condition.mask if condition.state else 0) if condition else None
-            ))
-
-    if isinstance(label, list) and len(label) > 0 and isinstance(label[0], ConditionalLabel):
-      for cl in label:
-        placeLabel(cl.label, cl.condition)
-      label = None
-
-    elif label.startswith("#"):
-      id = re.sub(r'[^a-zA-Z0-9]+', '_', label.replace('-\n',''))
-      label = None
-
-    if label != None:
-      placeLabel(label)
+        self.addLabel(x, y + y0 + i * buttonLabelFontSize, w, buttonLabelFontSize, line, centered, condition)
 
     if lightId >= 0:
-      self.light_uses.extend([
-        Element('param', {'name':'lightmask', 'value':f"{1 << lightId:04x}"}),
-        self.layout_element(ref=f'light', bounds=Rect(x + w/3, y + h/25, w/h, h/3))
-      ])  
+      mask = 1 << lightId
+      maskval = f'0x{mask:04x}'
 
-  def addSlider(self, x, y, w, h, channel, value):
-    bounds = Rect(x, y, w, h)
+      self.light_definitions.append(self.layout_element(contents=[
+        self.layout_rect(state="0", statemask=maskval, color="#112211"),
+        self.layout_rect(state=maskval, statemask=maskval, color="#22ff22"),
+      ],name=f"light_{lightId}",))
+
+      self.light_uses.extend([
+        self.layout_element(ref=f'light_{lightId}', name='lights', bounds=Rect(x + w/3, y + h/25, w/h, h/3))
+      ])
+
+  def addSlider(self, x, y, name):
+    bounds = Rect(x, y, 8, 24)  # always 8 wide, 24 tall
     self.rect = self.rect.union(bounds)
+
     self.slider_uses.extend([
-      Element('param', {'name':'slider_id', 'value':f"slider_{channel}"}, []),
-      Element('param', {'name':'port_name', 'value':f"analog_{channel}"}, []),
+      Element('param', {'name':'slider_id', 'value':f"{name}"}, []),
+      Element('param', {'name':'port_name', 'value':f"analog_{name}"}, []),
       self.layout_group(ref="slider", bounds=bounds)
     ])
 
@@ -508,32 +704,48 @@ class Panel:
   def addControls(self):
     # Normalize the keyboard string.
 
-    hasSeq = Condition('variant', "0x01", True)
+    hasSeq = Condition('hasSeq', 'variant', "0x01", True)
     noSeq = hasSeq.opposite()
 
-    hasBankSet = Condition('variant', "0x2", True);
+    hasBankSet = Condition('hasBankSet', 'variant', "0x2", True);
     noBankSet = hasBankSet.opposite();
 
-    self.addButtonWithLightBelowDisplay(10, 29, [
-      ConditionalLabel("BankSet", hasBankSet),
-      ConditionalLabel("Cart", noBankSet),
-    ], 52, SHADE_LIGHT, 0xf, condition=hasBankSet)
 
-    self.addButtonWithLightBelowDisplay(16, 29, "Sounds",   53, SHADE_LIGHT, 0xd)
-    self.addButtonWithLightBelowDisplay(22, 29, "Presets",  54, SHADE_LIGHT, 0x7)
 
-    self.addButtonBelowDisplay     (28, 29, "Seq",      51, SHADE_LIGHT, condition=hasSeq)
+    self.addButtonWithLightBelowDisplay(10, 29, "#CartBankSet", 52, SHADE_LIGHT, 0xf)
+    self.addLabel(10, 35, 6, buttonLabelFontSize, "Cart", condition=noBankSet)
+    self.addLabel(10, 35, 6, buttonLabelFontSize, "BankSet", condition=hasBankSet)
 
-    self.addButtonWithLightBelowDisplay(42, 29, "0", 55, SHADE_MEDIUM, 0xe)
-    self.addButtonWithLightBelowDisplay(48, 29, "1", 56, SHADE_MEDIUM, 0x6)
-    self.addButtonWithLightBelowDisplay(54, 29, "2", 57, SHADE_MEDIUM, 0x4)
-    self.addButtonWithLightBelowDisplay(60, 29, "3", 46, SHADE_MEDIUM, 0xc)
-    self.addButtonWithLightBelowDisplay(66, 29, "4", 47, SHADE_MEDIUM, 0x3)
-    self.addButtonWithLightBelowDisplay(72, 29, "5", 48, SHADE_MEDIUM, 0xb)
-    self.addButtonWithLightBelowDisplay(78, 29, "6", 49, SHADE_MEDIUM, 0x2)
-    self.addButtonWithLightBelowDisplay(84, 29, "7", 35, SHADE_MEDIUM, 0xa)
-    self.addButtonWithLightBelowDisplay(90, 29, "8", 34, SHADE_MEDIUM, 0x1)
-    self.addButtonWithLightBelowDisplay(96, 29, "9", 25, SHADE_MEDIUM, 0x9)
+    self.addButtonWithLightBelowDisplay(16, 29, "#Sounds",   53, SHADE_LIGHT, 0xd)
+    self.addLabel(16, 35, 6, buttonLabelFontSize, "Sounds")
+
+    self.addButtonWithLightBelowDisplay(22, 29, "#Presets",  54, SHADE_LIGHT, 0x7)
+    self.addLabel(22, 35, 6, buttonLabelFontSize, "Presets", condition=noBankSet)
+
+    self.addButtonBelowDisplay     (28, 29, "#Seq",      51, SHADE_LIGHT, condition=hasSeq)
+    self.addLabel(28, 35, 6, buttonLabelFontSize, "Seq", condition=hasSeq)
+
+    self.addButtonWithLightBelowDisplay(42, 29, "#0", 55, SHADE_MEDIUM, 0xe)
+    self.addButtonWithLightBelowDisplay(48, 29, "#1", 56, SHADE_MEDIUM, 0x6)
+    self.addButtonWithLightBelowDisplay(54, 29, "#2", 57, SHADE_MEDIUM, 0x4)
+    self.addButtonWithLightBelowDisplay(60, 29, "#3", 46, SHADE_MEDIUM, 0xc)
+    self.addButtonWithLightBelowDisplay(66, 29, "#4", 47, SHADE_MEDIUM, 0x3)
+    self.addButtonWithLightBelowDisplay(72, 29, "#5", 48, SHADE_MEDIUM, 0xb)
+    self.addButtonWithLightBelowDisplay(78, 29, "#6", 49, SHADE_MEDIUM, 0x2)
+    self.addButtonWithLightBelowDisplay(84, 29, "#7", 35, SHADE_MEDIUM, 0xa)
+    self.addButtonWithLightBelowDisplay(90, 29, "#8", 34, SHADE_MEDIUM, 0x1)
+    self.addButtonWithLightBelowDisplay(96, 29, "#9", 25, SHADE_MEDIUM, 0x9)
+
+    self.addLabel(42, 35, 6, buttonLabelFontSize, "0", centered=True)
+    self.addLabel(48, 35, 6, buttonLabelFontSize, "1", centered=True)
+    self.addLabel(54, 35, 6, buttonLabelFontSize, "2", centered=True)
+    self.addLabel(60, 35, 6, buttonLabelFontSize, "3", centered=True)
+    self.addLabel(66, 35, 6, buttonLabelFontSize, "4", centered=True)
+    self.addLabel(72, 35, 6, buttonLabelFontSize, "5", centered=True)
+    self.addLabel(78, 35, 6, buttonLabelFontSize, "6", centered=True)
+    self.addLabel(84, 35, 6, buttonLabelFontSize, "7", centered=True)
+    self.addLabel(90, 35, 6, buttonLabelFontSize, "8", centered=True)
+    self.addLabel(96, 35, 6, buttonLabelFontSize, "9", centered=True)
 
     # Large buttons on the main panel part
     self.addLargeButton         (108, 29, "Replace\nProgram", 29, SHADE_MEDIUM)
@@ -608,38 +820,42 @@ class Panel:
     self.addSmallButton(57, 21, "#display_below_middle", 44, SHADE_DARK, False)
     self.addSmallButton(82, 21, "#display_below_right", 45, SHADE_DARK, False)
 
-    self.addSmallButton(32,  4, "#display_above_left", 58, SHADE_DARK, False)
-    self.addSmallButton(57,  4, "#diplay_above_center", 42, SHADE_DARK, False)
-    self.addSmallButton(82,  4, "#display_above_right", 43, SHADE_DARK, False)
+    self.addSmallButton(32,  0, "#display_above_left", 58, SHADE_DARK, False)
+    self.addSmallButton(57,  0, "#diplay_above_center", 42, SHADE_DARK, False)
+    self.addSmallButton(82,  0, "#display_above_right", 43, SHADE_DARK, False)
 
     # Value slider
-    self.addSlider(-2.75, 4, 7, 22, 3, 0.7)
+    self.addSlider(-2.75, 4, "data_entry")
 
     # Increment and Decrement
     self.addIncDecButton(-12.5, 22, "#increment", 63, SHADE_DARK, False)
     self.addIncDecButton(-12.5, 12, "#decrement", 62, SHADE_DARK, False)
 
     # Volume slider
-    self.addSlider(-30, 4, 7, 22, 5, 1.0)
+    self.addSlider(-30, 4, "volume")
 
     self.rect = self.rect.outset(2, 2)
 
-    self.decoration_uses.append(
+    self.decoration_uses.insert(0, # put the background before anything else.
       self.layout_element(ref='background', bounds=self.rect)
     )
 
   def __str__(self):
     layout = Element('mamelayout', {'version':'2'})
     
+    layout.append(Space())
+    layout.append(Comment('Decoration definitions'))
+    layout.extend(self.decoration_definitions)
+
     layout.append(Comment('VFD'))
     layout.extend(self.vfd_definitions)
-
-    layout.append(Comment('Button shapes'))
-    layout.extend([shape for (k, shape) in self.button_shapes.items()])
 
     layout.append(Space())
     layout.append(Comment('Text items'))
     layout.extend([d for (k, d) in self.text_definitions.items()])
+
+    layout.append(Comment('Button shapes'))
+    layout.extend([shape for (k, shape) in self.button_shapes.items()])
 
     layout.append(Space())
     layout.append(Comment('Light items'))
@@ -650,20 +866,33 @@ class Panel:
     layout.extend(self.slider_definitions)
 
     layout.append(Space())
-    layout.append(Comment('Decoration definitions'))
+    layout.append(Comment('Panel Group'))
 
-    layout.append(Space())
-    layout.append(Comment('Panel View'))
-
-    group = Element('group', {'name':"Panel"}, [])
+    group = Element('group', {'name':'panel'}, [])
     layout.append(group)
+
+    group.extend(self.decoration_uses)
+
     group.extend(self.vfd_uses)
+
     group.extend(self.text_uses)
     group.extend(self.button_uses)
     group.extend(self.light_uses)
-    group.extend(self.slider_uses)
-    group.extend(self.decoration_uses)
     
+    group.extend(self.slider_uses)
+    
+    layout.append(Space())
+    layout.append(Comment('Panel View'))
+    view = Element('view', {'name':'Panel'}, [
+      Element('group', {'ref':'panel'})
+    ])
+    layout.append(view)
+
+    script = Element('script', {}, [
+      CDATA(script_main + slider_library)
+    ])
+    layout.append(script)
+
     document = Document(layout)
 
     return str(document)
