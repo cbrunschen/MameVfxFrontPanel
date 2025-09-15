@@ -360,6 +360,11 @@ class Panel:
     self.has_sequencer = keyboard.find('sd') >= 0
     self.is_sd1 = keyboard.find('sd1') >= 0
 
+    self.color_vfx = "#299ca3"
+    self.color_sd1 = "#db5f6a"
+
+    self.color = self.color_sd1 if self.is_sd1 else self.color_vfx
+
     self.rect = displayGlassRect
 
     self.button_shapes = {}
@@ -479,10 +484,15 @@ class Panel:
           </svg>
           '''))
       ]),
-    ]
 
-    self.color_vfx = "#299ca3"
-    self.color_sd1 = "#db5f6a"
+      self.layout_element(name='white_rect', contents=[
+        self.layout_rect(bounds=Rect(0, 0, 1, 1), color='#ffffff')
+      ]),
+
+      self.layout_element(name='colored_rect', contents=[
+        self.layout_rect(bounds=Rect(0, 0, 1, 1), color=self.color)
+      ])
+    ]
 
     self.button_uses = []
     self.text_uses = []
@@ -683,14 +693,24 @@ class Panel:
   def addLargeButton(self, x, y, label, value, shade, multiPage=False):
     self.addButton(x, y, 6, 4, label, ABOVE, value, shade, False, -1)
   
-  def addLargeButtonWithLight(self, x, y, label, value, shade, lightId):
-    self.addButton(x, y, 6, 4, label, ABOVE, value, shade, False, lightId)
+  def addLargeButtonWithLight(self, x, y, label, value, shade, lightId, centered=False):
+    self.addButton(x, y, 6, 4, label, ABOVE_CENTERED if centered else ABOVE, value, shade, False, lightId)
 
   def addSmallButton(self, x, y, label, value, shade, multiPage):
     self.addButton(x, y, 6, 2, label, ABOVE, value, shade, multiPage, -1)
   
   def addIncDecButton(self, x, y, label, value, shade, multiPage):
     self.addButton(x, y, 6, 2, label, ABOVE_CENTERED, value, shade, multiPage, -1)
+  
+  def addColoredLine(self, x, y, w, h):
+    bounds = Rect(x, y, w, h)
+    self.decoration_uses.append(self.layout_element(ref="colored_rect", bounds=bounds))
+    self.rect = self.rect.union(bounds)
+
+  def addWhiteLine(self, x, y, w, h):
+    bounds = Rect(x, y, w, h)
+    self.decoration_uses.append(self.layout_element(ref="white_rect", bounds=bounds))
+    self.rect = self.rect.union(bounds)
     
   def addControls(self):
     # Normalize the keyboard string.
@@ -737,8 +757,19 @@ class Panel:
 
     # Large buttons on the main panel part
     self.addLargeButton         (108, 29, "Replace\nProgram", 29, SHADE_MEDIUM)
-    self.addLargeButtonWithLight(114, 29, "1-6",              30, SHADE_MEDIUM, 0x0)
-    self.addLargeButtonWithLight(120, 29, "7-12",             31, SHADE_MEDIUM, 0x8)
+    if self.has_sequencer:
+      self.addWhiteLine(114, 29 - 1.5 * buttonLabelFontSize - 0.05, 3, 0.1)
+      self.addLabel(117, 29 - 2 * buttonLabelFontSize, 6, buttonLabelFontSize, "Tracks", centered=True)
+      self.addWhiteLine(123, 29 - 1.5 * buttonLabelFontSize - 0.05, 3, 0.1)
+
+      self.addLargeButtonWithLight(114, 29, "1-6",              30, SHADE_MEDIUM, 0x0, centered=True)
+      self.addLargeButtonWithLight(120, 29, "7-12",             31, SHADE_MEDIUM, 0x8, centered=True)
+    else:
+      self.addWhiteLine(114, 29 - 1.5 * buttonLabelFontSize - 0.05, 4, 0.1)
+      self.addLabel(118, 29 - 2 * buttonLabelFontSize, 4, buttonLabelFontSize, "Multi", centered=True)
+      self.addWhiteLine(122, 29 - 1.5 * buttonLabelFontSize - 0.05, 4, 0.1)
+      self.addLargeButtonWithLight(114, 29, "A",              30, SHADE_MEDIUM, 0x0, centered=True)
+      self.addLargeButtonWithLight(120, 29, "B",              31, SHADE_MEDIUM, 0x8, centered=True)
 
     self.addLargeButton         (154, 29, "Select\nVoice", 5, SHADE_MEDIUM)
     self.addLargeButton         (160, 29, "Copy",          9, SHADE_MEDIUM)
@@ -778,6 +809,10 @@ class Panel:
       self.addSmallButton(131,  6, "Master",        20, SHADE_LIGHT, True)
       self.addSmallButton(137,  6, "Storage",       21, SHADE_LIGHT, False)
       self.addSmallButton(143,  6, "MIDI\nControl", 24, SHADE_LIGHT, True)
+
+      self.addWhiteLine(131, 13 - 1.5 * buttonLabelFontSize - 0.05, 7, 0.1)
+      self.addLabel(138, 13 - 2 * buttonLabelFontSize, 4, buttonLabelFontSize, "Edit", centered=True)
+      self.addWhiteLine(142, 13 - 1.5 * buttonLabelFontSize - 0.05, 7, 0.1)
 
     else:
       # When there is no Sequencer:
@@ -828,29 +863,18 @@ class Panel:
     self.addSlider(-36, 4, "volume")
 
     # The colored lines along the base:
-    # First, let's define it
-    self.decoration_definitions.append(
-      self.layout_element(name='decorative_line', contents=[
-        self.layout_rect(color=color, bounds=Rect(0, 0, 1, 1)),
-        self.layout_rect(color=color, bounds=Rect(0, 0, 1, 1)),
-      ])
-    )
-
-    # Now, use it:
-    self.decoration_uses.extend([
-      self.layout_element(ref="decorative_line", bounds=Rect(-36, 37, 166, 0.5)),
-      self.layout_element(ref="decorative_line", bounds=Rect(108, 37, 22, 0.5)),
-      self.layout_element(ref="decorative_line", bounds=Rect(131, 37, 22, 0.5)),
-      self.layout_element(ref="decorative_line", bounds=Rect(154, 37, 24, 0.5)),
-    ])
-    # Ensure it's included in our rectangle.
-    self.rect = self.rect.union(Rect(0, 37, 1, 0.5))
+    self.addColoredLine(-36, 37, 166, 0.5)
+    self.addColoredLine(108, 37, 22, 0.5)
+    self.addColoredLine(131, 37, 22, 0.5)
+    self.addColoredLine(154, 37, 24, 0.5)
 
     # And the labels just above it:
     self.addLabel(-36, 35, 10, buttonLabelFontSize, "Volume")
     self.addLabel(-17, 35, 10, buttonLabelFontSize, "Data Entry")
     self.addLabel(108, 35, 10, buttonLabelFontSize, "Performance")
     if self.has_sequencer:
+      self.addLabel(131, 2-(0.2 + buttonLabelFontSize), 10, buttonLabelFontSize, "System")
+      self.addColoredLine(131, 2-0.2, 22, 0.2)
       self.addLabel(131, 35, 10, buttonLabelFontSize, "Sequencer")
     else:
       self.addLabel(131, 35, 10, buttonLabelFontSize, "System")
