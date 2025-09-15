@@ -462,15 +462,34 @@ class Panel:
 
       self.layout_element(name='display_glass', contents=[
         self.layout_rect(color="#000000", bounds=displayGlassRect)
-      ])
+      ]),
+
+      self.layout_element(name='up_triangle', contents=[
+        self.layout_svg_image(svg=dedent('''\
+          <svg width="2" height="1" viewBox="0 0 2 1">
+          <path stroke="none" fill="#ffffff" d="M0 1H2L 1 0Z" />
+          </svg>
+          '''))
+      ]),
+      
+      self.layout_element(name='down_triangle', contents=[
+        self.layout_svg_image(svg=dedent('''\
+          <svg width="2" height="1" viewBox="0 0 2 1">
+          <path stroke="none" fill="#ffffff" d="M0 0H2L1 1Z" />
+          </svg>
+          '''))
+      ]),
     ]
+
+    self.color_vfx = "#299ca3"
+    self.color_sd1 = "#db5f6a"
 
     self.button_uses = []
     self.text_uses = []
     self.light_uses = []
     self.slider_uses = []
     self.decoration_uses = [
-      self.layout_element(ref='display_glass', bounds=displayGlassRect)
+      self.layout_element(ref='display_glass', bounds=displayGlassRect),
     ]
     self.vfd_uses = [
       dedent(f'''\
@@ -672,25 +691,27 @@ class Panel:
   
   def addIncDecButton(self, x, y, label, value, shade, multiPage):
     self.addButton(x, y, 6, 2, label, ABOVE_CENTERED, value, shade, multiPage, -1)
-  
+    
   def addControls(self):
     # Normalize the keyboard string.
 
     self.addButtonWithLightBelowDisplay(10, 29, "#CartBankSet", 52, SHADE_LIGHT, 0xf)
     if self.is_sd1:
-      self.addLabel(10, 35, 6, buttonLabelFontSize, "BankSet")
+      color = self.color_sd1
+      self.addLabel(10, 35, 6, buttonLabelFontSize, "BankSet", centered=True)
     else:
-      self.addLabel(10, 35, 6, buttonLabelFontSize, "Cart")
+      color = self.color_vfx
+      self.addLabel(10, 35, 6, buttonLabelFontSize, "Cart", centered=True)
 
     self.addButtonWithLightBelowDisplay(16, 29, "#Sounds",   53, SHADE_LIGHT, 0xd)
-    self.addLabel(16, 35, 6, buttonLabelFontSize, "Sounds")
+    self.addLabel(16, 35, 6, buttonLabelFontSize, "Sounds", centered=True)
 
     self.addButtonWithLightBelowDisplay(22, 29, "#Presets",  54, SHADE_LIGHT, 0x7)
-    self.addLabel(22, 35, 6, buttonLabelFontSize, "Presets")
+    self.addLabel(22, 35, 6, buttonLabelFontSize, "Presets", centered=True)
 
     if self.has_sequencer:
       self.addButtonBelowDisplay     (28, 29, "#Seq",      51, SHADE_LIGHT)
-      self.addLabel(28, 35, 6, buttonLabelFontSize, "Seq")
+      self.addLabel(28, 35, 6, buttonLabelFontSize, "Seq", centered=True)
 
     self.addButtonWithLightBelowDisplay(42, 29, "#0", 55, SHADE_MEDIUM, 0xe)
     self.addButtonWithLightBelowDisplay(48, 29, "#1", 56, SHADE_MEDIUM, 0x6)
@@ -792,15 +813,50 @@ class Panel:
     self.addSmallButton(82,  0, "#display_above_right", 43, SHADE_DARK, False)
 
     # Value slider
-    self.addSlider(-2.75, 4, "data_entry")
+    self.addSlider(-8, 4, "data_entry")
 
     # Increment and Decrement
-    self.addIncDecButton(-12.5, 22, "#increment", 63, SHADE_DARK, False)
-    self.addIncDecButton(-12.5, 12, "#decrement", 62, SHADE_DARK, False)
+    self.addIncDecButton(-17, 22, "#increment", 63, SHADE_DARK, False)
+    self.addIncDecButton(-17, 12, "#decrement", 62, SHADE_DARK, False)
+
+    self.decoration_uses.extend([
+      self.layout_element(ref="up_triangle", bounds=Rect(-15, 10, 2, 1)),
+      self.layout_element(ref="down_triangle", bounds=Rect(-15, 20, 2, 1))
+    ])
 
     # Volume slider
-    self.addSlider(-30, 4, "volume")
+    self.addSlider(-36, 4, "volume")
 
+    # The colored lines along the base:
+    # First, let's define it
+    self.decoration_definitions.append(
+      self.layout_element(name='decorative_line', contents=[
+        self.layout_rect(color=color, bounds=Rect(0, 0, 1, 1)),
+        self.layout_rect(color=color, bounds=Rect(0, 0, 1, 1)),
+      ])
+    )
+
+    # Now, use it:
+    self.decoration_uses.extend([
+      self.layout_element(ref="decorative_line", bounds=Rect(-36, 37, 166, 0.5)),
+      self.layout_element(ref="decorative_line", bounds=Rect(108, 37, 22, 0.5)),
+      self.layout_element(ref="decorative_line", bounds=Rect(131, 37, 22, 0.5)),
+      self.layout_element(ref="decorative_line", bounds=Rect(154, 37, 24, 0.5)),
+    ])
+    # Ensure it's included in our rectangle.
+    self.rect = self.rect.union(Rect(0, 37, 1, 0.5))
+
+    # And the labels just above it:
+    self.addLabel(-36, 35, 10, buttonLabelFontSize, "Volume")
+    self.addLabel(-17, 35, 10, buttonLabelFontSize, "Data Entry")
+    self.addLabel(108, 35, 10, buttonLabelFontSize, "Performance")
+    if self.has_sequencer:
+      self.addLabel(131, 35, 10, buttonLabelFontSize, "Sequencer")
+    else:
+      self.addLabel(131, 35, 10, buttonLabelFontSize, "System")
+    self.addLabel(154, 35, 10, buttonLabelFontSize, "Programming")
+
+    # Add just a little space around.
     self.rect = self.rect.outset(2, 2)
 
     self.decoration_uses.insert(0, # put the background before anything else.
