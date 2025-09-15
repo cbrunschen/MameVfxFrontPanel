@@ -96,8 +96,10 @@ local function pointer_updated(type, id, dev, x, y, btn, dn, up, cnt)
   end
 
   new_value = math.floor(new_value + 0.5)
+  emu.print_error("layout calculated new slider value as " .. new_value)
   if new_value < 0 then new_value = 0 end
   if new_value > 100 then new_value = 100 end
+  emu.print_error(" and limited it to " .. new_value .. "\r\n")
   slider.field.user_value = new_value
 end
 

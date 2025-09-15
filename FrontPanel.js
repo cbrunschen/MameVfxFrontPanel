@@ -612,7 +612,7 @@ var fp = (function() {
     this.handleW = w - 1.5;
     this.handleH = 4;
     this.handleMinY = 0.75;
-    this.handleMaxY = h - 0.75 - this.handleH;
+    this.handleMaxY = h - 1.5 - this.handleH;
 
     this.handle = my.createElement("g");
     this.handle.appendChild(makeRectPath(0, 0, this.handleW, this.handleH, "#333333"));
@@ -643,7 +643,10 @@ var fp = (function() {
     console.log(`Moving slider to fraction ${value}`);
 
     this.value = Math.max(0.0, Math.min((1.0, value)));
-    this.handleY = this.handleMinY + (1.0 - value) * (this.handleMaxY - this.handleMinY);
+    this.handleY = Math.max(this.handleMinY, 
+      Math.min(this.handleMaxY, 
+        this.handleMinY + (1.0 - value) * (this.handleMaxY - this.handleMinY)
+      ));
     this.handle.setAttribute("transform", "translate(" + this.handleX + "," + this.handleY + ")");
   }
 

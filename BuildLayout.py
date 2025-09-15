@@ -8,13 +8,21 @@ import sys
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-slider_library = '''\
+slider_library = r'''
 -----------------------------------------------------------------------
--- Slider library starts.
+-- Simplified Slider library starts.
 -- Can be copied as-is to other layouts.
+-- It is simplified from its source:
+-- * This one never reads from the port, only writes to it.
+-- * Only when clickling on the knob itself does it start to drag the knob.
+-- * The value is calculated based on the position of the knob within the click area.
 -----------------------------------------------------------------------
 local sliders = {}   -- Stores slider information.
 local pointers = {}  -- Tracks pointer state.
+
+function clamp(x)
+  if x < 0 then return 0 elseif x > 100 then return 100 else return x end
+end
 
 -- The knob's Y position must be animated using <animate inputtag="{port_name}">.
 -- The click area's vertical size must exactly span the range of the
@@ -66,14 +74,8 @@ local function pointer_updated(type, id, dev, x, y, btn, dn, up, cnt)
       if sliders[i].knob.bounds:includes(x, y) then
         pointers[id] = {
           selected_slider = i,
-          relative = true,
-          start_y = y,
-          start_value = sliders[i].field.user_value }
-        break
-      elseif sliders[i].clickarea.bounds:includes(x, y) then
-        pointers[id] = {
-          selected_slider = i,
-          relative = false }
+          dy = y - sliders[i].knob.bounds.y0 -- position within the knob where it was clicked
+        }
         break
       end
     end
@@ -90,26 +92,17 @@ local function pointer_updated(type, id, dev, x, y, btn, dn, up, cnt)
 
   local pointer = pointers[id]
   local slider = sliders[pointer.selected_slider]
-
-  local knob_half_height = slider.knob.bounds.height / 2
-  local min_y = slider.clickarea.bounds.y0 + knob_half_height
-  local max_y = slider.clickarea.bounds.y1 - knob_half_height
+  local knob = slider.knob
+  local clickarea = slider.clickarea
 
   local new_value = 0
-  if pointer.relative then
-    -- User clicked on the knob. The new value will depend on how much the
-    -- knob was dragged.
-    new_value = pointer.start_value - 100 * (y - pointer.start_y) / (max_y - min_y)
-  else
-    -- User clicked elsewhere on the slider. The new value will depend on
-    -- the absolute position of the click.
-    new_value = 100 - 100 * (y - min_y) / (max_y - min_y)
-  end
-
+  -- User clicked on the knob. The new value will depend on how much the
+  -- knob was dragged.
+  local yy = y - pointer.dy
+  new_value = 100 * (1 - (yy - clickarea.bounds.y0) / (clickarea.bounds.height - knob.bounds.height))
   new_value = math.floor(new_value + 0.5)
-  if new_value < 0 then new_value = 0 end
-  if new_value > 100 then new_value = 100 end
-  slider.field.user_value = new_value
+  clamped_value = clamp(new_value)
+  slider.field.user_value = clamped_value
 end
 
 local function pointer_left(type, id, dev, x, y, up, cnt)
@@ -361,18 +354,12 @@ displayGlassRect = Rect(10, -2, 92, 27)
 def rgb_components(rgb):
   return [int(c, 16) / 255.0 for c in wrap(rgb.removeprefix('#'), 2)]
 
-@dataclass
-class Condition:
-  name: str
-  source: str
-  mask: int
-  state: bool
-
-  def opposite(self):
-    return Condition(self.name, self.source, self.mask, not self.state)
-
 class Panel:
-  def __init__(self):
+  def __init__(self, keyboard):
+    self.keyboard = keyboard
+    self.has_sequencer = keyboard.find('sd') >= 0
+    self.is_sd1 = keyboard.find('sd1') >= 0
+
     self.rect = displayGlassRect
 
     self.button_shapes = {}
@@ -399,9 +386,9 @@ class Panel:
       ]),
       self.layout_group(name="slider", contents=[
         self.layout_element(ref="slider_frame", bounds=Rect(0, 0, 8, 24)),
-        self.layout_element(id="slider_~slider_id~", ref="invisible_rect", bounds=Rect(0.75, 0.75, 7, 19.5)),
+        self.layout_element(id="slider_~slider_id~", ref="invisible_rect", bounds=Rect(0.75, 0.75, 6.5, 18.5)),
         self.layout_element(ref="slider_knob", id="slider_knob_~slider_id~", contents=[
-          self.layout_tag('animate', inputtag="~port_name~", inputmask="0x3ff"),
+          self.layout_tag('animate', inputtag="~port_name~", inputmask="0x7f"),
           self.layout_bounds(knobTop, state="100"),
           self.layout_bounds(knobBottom, state="0"),
         ]),
@@ -575,26 +562,17 @@ class Panel:
       e.append(self.layoutColor(color))
     return e
 
-  def addLabel(self, x, y, w, fontSize, label, centered = False, condition = None, suffix = '', hidden = False):      
+  def addLabel(self, x, y, w, fontSize, label, centered = False):      
     bounds = Rect(x, y, w, fontSize)
     self.rect = self.rect.union(bounds)
 
     align = "0" if centered else "1"
     alignment = "C" if centered else "L"
-    condition_suffix = f'__C_{condition.name}_{condition.state}' if condition else ''
 
-    id = f'{to_id(label)}_{alignment}{condition_suffix}{suffix}'
+    id = f'{to_id(label)}_{alignment}'
 
     defattr = {}
     useattr = {}
-
-    if condition:
-      defattr['statemask'] = condition.mask
-      defattr['state'] = condition.mask if condition.state else "0"
-    elif hidden:
-      defattr['state'] = '1'
-      defattr['defstate'] = '0'
-      useattr['id'] = f'label_{id}'
 
     if id not in self.text_definitions:
       self.text_definitions[id] = self.layout_element(
@@ -609,19 +587,16 @@ class Panel:
       self.layout_element(
         ref=f'text_{id}',
         bounds=bounds,
-        name=condition.source if condition else None,
         **useattr
         ))
 
-  def addButton(self, x, y, w, h, label, labelPosition, value, shade, multiPage = False, lightId = None, condition = None):
+  def addButton(self, x, y, w, h, label, labelPosition, value, shade, multiPage = False, lightId = None):
     bounds = Rect(x, y, w, h)
     self.rect = self.rect.union(bounds)
 
-    condition_suffix = f'__C_{condition.name}_{condition.state}' if condition else ''
-
     # Ensure that there's a reusable button shape
     (shade_name, rgb_default, rgb_pressed) = shade
-    shape_name = f'button_{w}_{h}_{shade_name}{condition_suffix}'
+    shape_name = f'button_{w}_{h}_{shade_name}'
 
     if shape_name not in self.button_shapes:
       rect = Rect(0, 0, w, h).inset(0.1, 0.1)
@@ -636,7 +611,7 @@ class Panel:
     mask = 1 << (value % 32)
     inputmask = f'0x{mask:08x}'
 
-    button_id = f'button_{value}_{to_id(label)}{condition_suffix}'
+    button_id = f'button_{value}_{to_id(label)}'
 
     self.button_uses.append(
       self.layout_element(
@@ -647,9 +622,6 @@ class Panel:
       )
     )
 
-    if condition:
-      self.show_if.append((button_id, condition.name, condition.state))
-
     if not label.startswith("#"):
       labelLines = label.split("\n")
       nLines = len(labelLines)
@@ -658,7 +630,7 @@ class Panel:
       
       for i in range(nLines):
         line = labelLines[i]
-        self.addLabel(x, y + y0 + i * buttonLabelFontSize, w, buttonLabelFontSize, line, centered, condition)
+        self.addLabel(x, y + y0 + i * buttonLabelFontSize, w, buttonLabelFontSize, line, centered)
 
     if lightId >= 0:
       mask = 1 << lightId
@@ -683,47 +655,42 @@ class Panel:
       self.layout_group(ref="slider", bounds=bounds)
     ])
 
-  def addButtonBelowDisplay(self, x, y, label, value, shade, condition=None):
-    self.addButton(x, y, 6, 4, label, BELOW, value, shade, False, -1, condition=condition)
+  def addButtonBelowDisplay(self, x, y, label, value, shade):
+    self.addButton(x, y, 6, 4, label, BELOW, value, shade, False, -1)
   
-  def addButtonWithLightBelowDisplay(self, x, y, label, value, shade, lightId, condition=None):
-    self.addButton(x, y, 6, 4, label, BELOW, value, shade, False, lightId, condition=condition)
+  def addButtonWithLightBelowDisplay(self, x, y, label, value, shade, lightId):
+    self.addButton(x, y, 6, 4, label, BELOW, value, shade, False, lightId)
   
-  def addLargeButton(self, x, y, label, value, shade, multiPage=False, condition=None):
-    self.addButton(x, y, 6, 4, label, ABOVE, value, shade, False, -1, condition=condition)
+  def addLargeButton(self, x, y, label, value, shade, multiPage=False):
+    self.addButton(x, y, 6, 4, label, ABOVE, value, shade, False, -1)
   
-  def addLargeButtonWithLight(self, x, y, label, value, shade, lightId, condition=None):
-    self.addButton(x, y, 6, 4, label, ABOVE, value, shade, False, lightId, condition=condition)
+  def addLargeButtonWithLight(self, x, y, label, value, shade, lightId):
+    self.addButton(x, y, 6, 4, label, ABOVE, value, shade, False, lightId)
 
-  def addSmallButton(self, x, y, label, value, shade, multiPage, condition=None):
-    self.addButton(x, y, 6, 2, label, ABOVE, value, shade, multiPage, -1, condition=condition)
+  def addSmallButton(self, x, y, label, value, shade, multiPage):
+    self.addButton(x, y, 6, 2, label, ABOVE, value, shade, multiPage, -1)
   
-  def addIncDecButton(self, x, y, label, value, shade, multiPage, condition=None):
-    self.addButton(x, y, 6, 2, label, ABOVE_CENTERED, value, shade, multiPage, -1, condition=condition)
+  def addIncDecButton(self, x, y, label, value, shade, multiPage):
+    self.addButton(x, y, 6, 2, label, ABOVE_CENTERED, value, shade, multiPage, -1)
   
   def addControls(self):
     # Normalize the keyboard string.
 
-    hasSeq = Condition('hasSeq', 'variant', "0x01", True)
-    noSeq = hasSeq.opposite()
-
-    hasBankSet = Condition('hasBankSet', 'variant', "0x2", True);
-    noBankSet = hasBankSet.opposite();
-
-
-
     self.addButtonWithLightBelowDisplay(10, 29, "#CartBankSet", 52, SHADE_LIGHT, 0xf)
-    self.addLabel(10, 35, 6, buttonLabelFontSize, "Cart", condition=noBankSet)
-    self.addLabel(10, 35, 6, buttonLabelFontSize, "BankSet", condition=hasBankSet)
+    if self.is_sd1:
+      self.addLabel(10, 35, 6, buttonLabelFontSize, "BankSet")
+    else:
+      self.addLabel(10, 35, 6, buttonLabelFontSize, "Cart")
 
     self.addButtonWithLightBelowDisplay(16, 29, "#Sounds",   53, SHADE_LIGHT, 0xd)
     self.addLabel(16, 35, 6, buttonLabelFontSize, "Sounds")
 
     self.addButtonWithLightBelowDisplay(22, 29, "#Presets",  54, SHADE_LIGHT, 0x7)
-    self.addLabel(22, 35, 6, buttonLabelFontSize, "Presets", condition=noBankSet)
+    self.addLabel(22, 35, 6, buttonLabelFontSize, "Presets")
 
-    self.addButtonBelowDisplay     (28, 29, "#Seq",      51, SHADE_LIGHT, condition=hasSeq)
-    self.addLabel(28, 35, 6, buttonLabelFontSize, "Seq", condition=hasSeq)
+    if self.has_sequencer:
+      self.addButtonBelowDisplay     (28, 29, "#Seq",      51, SHADE_LIGHT)
+      self.addLabel(28, 35, 6, buttonLabelFontSize, "Seq")
 
     self.addButtonWithLightBelowDisplay(42, 29, "#0", 55, SHADE_MEDIUM, 0xe)
     self.addButtonWithLightBelowDisplay(48, 29, "#1", 56, SHADE_MEDIUM, 0x6)
@@ -771,34 +738,34 @@ class Panel:
     self.addSmallButton(114,  6, "Pan",             37, SHADE_DARK, False)
     self.addSmallButton(120,  6, "Timbre",          38, SHADE_DARK, False)
 
-
     # When the keyboard has a sequencer:
-    # The 'Master', 'Storage' and 'MIDI Control' buttons are small & at the top,
-    # the sequencer buttons are big and at the bottom.
-    self.addLargeButton(131, 29, "Rec",           19, SHADE_MEDIUM, condition=hasSeq)
-    self.addLargeButton(137, 29, "Stop\n/Cont",   22, SHADE_MEDIUM, condition=hasSeq)
-    self.addLargeButton(143, 29, "Play",          23, SHADE_MEDIUM, condition=hasSeq)
+    if self.has_sequencer:
+      # The 'Master', 'Storage' and 'MIDI Control' buttons are small & at the top,
+      # the sequencer buttons are big and at the bottom.
+      self.addLargeButton(131, 29, "Rec",           19, SHADE_MEDIUM)
+      self.addLargeButton(137, 29, "Stop\n/Cont",   22, SHADE_MEDIUM)
+      self.addLargeButton(143, 29, "Play",          23, SHADE_MEDIUM)
 
-    self.addSmallButton(131, 20, "Click",         32, SHADE_DARK, False, condition=hasSeq)
-    self.addSmallButton(137, 20, "Seq\nControl",  18, SHADE_DARK, True, condition=hasSeq)
-    self.addSmallButton(143, 20, "Locate",        33, SHADE_DARK, True, condition=hasSeq)
+      self.addSmallButton(131, 20, "Click",         32, SHADE_DARK, False)
+      self.addSmallButton(137, 20, "Seq\nControl",  18, SHADE_DARK, True)
+      self.addSmallButton(143, 20, "Locate",        33, SHADE_DARK, True)
 
-    self.addSmallButton(131, 13, "Song",          60, SHADE_DARK, False, condition=hasSeq)
-    self.addSmallButton(137, 13, "Seq",           59, SHADE_DARK, False, condition=hasSeq)
-    self.addSmallButton(143, 13, "Track",         61, SHADE_DARK, False, condition=hasSeq)
+      self.addSmallButton(131, 13, "Song",          60, SHADE_DARK, False)
+      self.addSmallButton(137, 13, "Seq",           59, SHADE_DARK, False)
+      self.addSmallButton(143, 13, "Track",         61, SHADE_DARK, False)
 
-    self.addSmallButton(131,  6, "Master",        20, SHADE_LIGHT, True, condition=hasSeq)
-    self.addSmallButton(137,  6, "Storage",       21, SHADE_LIGHT, False, condition=hasSeq)
-    self.addSmallButton(143,  6, "MIDI\nControl", 24, SHADE_LIGHT, True, condition=hasSeq)
+      self.addSmallButton(131,  6, "Master",        20, SHADE_LIGHT, True)
+      self.addSmallButton(137,  6, "Storage",       21, SHADE_LIGHT, False)
+      self.addSmallButton(143,  6, "MIDI\nControl", 24, SHADE_LIGHT, True)
 
-    # When there is no Sequencer:
-    # The 'Master', 'Storage' and 'MIDI Control' buttons are large & at the bottom,
-    # and there are no sequencer buttons
-    self.addLargeButton(131, 29, "Master",        20, SHADE_LIGHT, True, condition=noSeq)
-    self.addLargeButton(137, 29, "Storage",       21, SHADE_LIGHT, False, condition=noSeq)
-    self.addLargeButton(143, 29, "MIDI\nControl", 24, SHADE_LIGHT, True, condition=noSeq)
+    else:
+      # When there is no Sequencer:
+      # The 'Master', 'Storage' and 'MIDI Control' buttons are large & at the bottom,
+      # and there are no sequencer buttons
+      self.addLargeButton(131, 29, "Master",        20, SHADE_LIGHT, True)
+      self.addLargeButton(137, 29, "Storage",       21, SHADE_LIGHT, False)
+      self.addLargeButton(143, 29, "MIDI\nControl", 24, SHADE_LIGHT, True)
     
-
     # -- Programming:
     self.addSmallButton(154, 20, "Wave",             4, SHADE_DARK, False)
     self.addSmallButton(160, 20, "Mod\nMixer",       6, SHADE_DARK, False)
@@ -897,7 +864,12 @@ class Panel:
 
     return str(document)
 
-p = Panel()
-p.addControls()
+def main(argv: list[str]) -> int:
+  for i in range(1, len(argv)):
+    p = Panel(argv[i])
+    p.addControls()
+    print(p)
+  return 0
 
-print(p)
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
