@@ -7,6 +7,8 @@
 #include <list>
 #include <unordered_set>
 #include <map>
+#include <filesystem>
+#include <fstream>
 
 #include <unistd.h>
 #include <poll.h>
@@ -20,13 +22,18 @@
 
 #include "civetweb.h"
 
+#define HTML "FrontPanel.html"
+#define JS "FrontPanel.js"
+
 static const char html[] {
-#embed "FrontPanel.html"
+#embed HTML
 };
+static std::string htmls(html);
 
 static const char js[] {
-#embed "FrontPanel.js"
+#embed JS
 };
+static std::string jss(js);
 
 static const char WS_URL[] = "/socket";
 
@@ -144,7 +151,8 @@ std::ostream &operator<<(std::ostream &o, struct addrinfo *pai) {
 struct Server {
   std::string mame_host;
   std::string mame_port;
-
+  std::filesystem::path webroot;
+  
   // Also used for locking.
   struct mg_context *m_mg_ctx = nullptr;
 
@@ -412,6 +420,42 @@ struct Server {
   std::thread start_mame_thread() {
     return std::thread(&Server::talk_to_mame, this);
   }
+
+  std::filesystem::path html_path() {
+    auto path = webroot;
+    path.append(HTML);
+    return path;
+  }
+
+  std::filesystem::path js_path() {
+    auto path = webroot;
+    path.append(JS);
+    return path;
+  }
+
+  std::string load(const std::filesystem::path &path) {
+    auto size = std::filesystem::file_size(path);
+    std::string s(size, '\0');
+    std::ifstream in(path);
+    in.read(&s[0], size);
+    return s;
+  }
+
+  std::string js() {
+    if (webroot != "") {
+      return load(js_path());
+    } else {
+      return jss; 
+    }
+  }
+
+  std::string html() {
+    if (webroot != "") {
+      return load(html_path());
+    } else {
+      return htmls; 
+    }
+  }
 };
 
 /**
@@ -573,7 +617,8 @@ static int serve_html(struct mg_connection *conn, void *user_data) {
 
   auto lookup = [server](std::string &s) { return server->substitute(s); };
   std::stringstream templated;
-  write_template(templated, html, lookup, '$', '$');
+
+  write_template(templated, server->html(), lookup, '$', '$');
   std::string result = templated.str();
 
   mg_send_http_ok(conn, "text/html", result.length());
@@ -585,8 +630,9 @@ static int serve_html(struct mg_connection *conn, void *user_data) {
 static int serve_js(struct mg_connection *conn, void *user_data) {
   Server *server = static_cast<Server *>(user_data);
 
-  mg_send_http_ok(conn, "text/javascript", sizeof(js));
-  mg_write(conn, js, sizeof(js));
+  std::string js = server->js();
+  mg_send_http_ok(conn, "text/javascript", js.length());
+  mg_write(conn, js.data(), js.length());
 
   return 200; /* HTTP state 200 = OK */
 }
@@ -600,6 +646,8 @@ int main(int argc, char *argv[]) {
   std::map<std::string, std::string, std::less<>> options {
     {"mame_host", "localhost"},
     {"mame_port", "15112"},
+    // {"webroot", "../../.."},  // during JS development
+    {"webroot", ""},
   };
 
   static const char *web_server_options[] = {
@@ -659,8 +707,10 @@ int main(int argc, char *argv[]) {
 
   std::string &mame_host = options["mame_host"];
   std::string &mame_port = options["mame_port"];
+  std::string &webroot = options["webroot"];
 
-  Server server { mame_host, mame_port };
+  Server server { mame_host, mame_port, webroot };
+
   // By default, gues it's a VFX, version 0.
   server.set_template_value("keyboard", "vfx");
   server.set_template_value("version", "0");
