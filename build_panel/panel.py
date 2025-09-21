@@ -139,6 +139,9 @@ class Symbol(PanelElement):
   name: str
   color: str
 
+  def accept(self, visitor):
+    visitor.visitSymbol(self)
+
 @dataclass
 class Conditional(PanelElement):
   condition: str

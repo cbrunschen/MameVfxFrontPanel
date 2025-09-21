@@ -936,6 +936,19 @@ class Panel {
     this.decorationsContainer.appendChild(rectangle);
   }
 
+  addSymbol(x, y, w, h, symbolName) {
+    console.log(`Adding symbol '${symbolName}' at ${x},${y}, ${w} by ${h}`)
+    let path = createElement("path")
+    path.setAttribute("stroke", "none");
+    path.setAttribute("fill", "#ffffff");
+    if (symbolName == 'triangle_up') {
+      path.setAttribute("d", `M${x} ${y+h}h${w}l${-w/2} ${-h}z`);
+    } else if (symbolName == 'triangle_down') {
+      path.setAttribute("d", `M${x} ${y}h${w}l${-w/2} ${h}z`);
+    }
+    this.decorationsContainer.appendChild(path);
+  }
+
   populate(keyboard) {
     var hasSeq = false;
     var isSd1 = false;
@@ -1075,6 +1088,8 @@ class Panel {
     this.addSlider(-8, 4, 8, 24, 3, 0.5);
     this.addButton(-17, 22, 6, 2, 63, Shade.DARK);
     this.addButton(-17, 12, 6, 2, 62, Shade.DARK);
+    this.addSymbol(-15, 10, 2, 1, "triangle_up");
+    this.addSymbol(-15, 20, 2, 1, "triangle_down");
     this.addSlider(-36, 4, 8, 24, 5, 0.5);
     this.addRectangle(-36, 37, 166, 0.5, this.accentColor);
     this.addRectangle(108, 37, 22, 0.5, this.accentColor);
