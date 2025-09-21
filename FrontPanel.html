@@ -15,7 +15,7 @@ function wsroot() {
 
 function prepare() {
   var panelUrl = wsroot();
-  var panel = new fp.Panel(panelUrl, '$keyboard$', '$version$');
+  var panel = new Panel(panelUrl, '$keyboard$', '$version$');
   document.body.appendChild(panel.container);
   panel.showMessage("Connecting to server...");
 }
