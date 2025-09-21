@@ -409,24 +409,24 @@ class Rect {
   }
 }
 
-displayRect = new Rect(15, 6.5, 82, 12);
-displayGlassRect = new Rect(10, -2, 92, 27);
+displayRect = new Rect(37.5, 16.25, 205, 30);
+displayGlassRect = new Rect(25, -5, 230, 67.5);
 
 class Button {
   constructor(x, y, w, h, number, color) {
     var that = this;
     this.rect = new Rect(x, y, w, h);
 
-    var rect = this.rect.inset(0.1, 0.1);
+    var rect = this.rect.inset(0.25, 0.25);
     var translation = "translate(" + x + "," + y + ")";
-    this.halo = rect.toPath(0.5);
+    this.halo = rect.toPath(1.25);
     this.halo.setAttribute("stroke", "#666666");
-    this.halo.setAttribute("stroke-width", "2");
+    this.halo.setAttribute("stroke-width", "5");
     this.halo.setAttribute("fill", "none");
     hideElement(this.halo);
 
-    rect = new Rect(0, 0, w, h).inset(0.1, 0.1);
-    this.outline = rect.toPath(0.5);
+    rect = rect.offset(-rect.x, -rect.y)
+    this.outline = rect.toPath(1.25);
     this.outline.setAttribute("fill", color);
     this.outline.setAttribute("stroke", "none");
 
@@ -564,23 +564,23 @@ class Slider {
 
     this.frameColor = "#333333";
     this.frameActiveColor = "#666666";
-    this.frame = rect.inset(0.25, 0.25).toPath();
+    this.frame = rect.inset(0.625, 0.625).toPath();
     this.frame.setAttribute("stroke", this.frameColor);
-    this.frame.setAttribute("stroke-width", "0.5");
+    this.frame.setAttribute("stroke-width", "1.25");
     this.group.appendChild(this.frame);
 
-    this.handleX = 0.75;
-    this.handleW = w - 1.5;
-    this.handleH = 4;
-    this.handleMinY = 0.75;
-    this.handleMaxY = h - 1.5 - this.handleH;
+    this.handleX = 1.875;
+    this.handleW = w - 3.75;
+    this.handleH = 10;
+    this.handleMinY = 2.875;
+    this.handleMaxY = h - 3.75 - this.handleH;
 
     this.handle = createElement("g");
     this.handle.appendChild(makeRectPath(0, 0, this.handleW, this.handleH, "#333333"));
-    this.handle.appendChild(makeRectPath(0, 0, this.handleW, 0.75, "#444444"));
-    this.handle.appendChild(makeRectPath(0, 1.75, this.handleW, 0.25, "#222222"));
-    this.handle.appendChild(makeRectPath(0, 2, this.handleW, 0.25, "#444444"));
-    this.handle.appendChild(makeRectPath(0, 3.25, this.handleW, 0.75, "#222222"));
+    this.handle.appendChild(makeRectPath(0, 0, this.handleW, 1.875, "#444444"));
+    this.handle.appendChild(makeRectPath(0, 4.375, this.handleW, 0.625, "#222222"));
+    this.handle.appendChild(makeRectPath(0, 5, this.handleW, 0.625, "#444444"));
+    this.handle.appendChild(makeRectPath(0, 8.175, this.handleW, 1.875, "#222222"));
     this.group.appendChild(this.handle);
 
     this.setValue(value);
@@ -730,6 +730,9 @@ class Panel {
     this.haloContainer = createElement("g");
     this.container.appendChild(this.haloContainer);
 
+    this.labelContainer = createElement("g");
+    this.container.appendChild(this.labelContainer);
+
     this.mainContainer = createElement("g");
     this.container.appendChild(this.mainContainer);
 
@@ -764,7 +767,7 @@ class Panel {
 
     this.messageText.setAttribute('fill', "#aaaaaaff");
     this.messageText.setAttribute('stroke', 'none');
-    this.messageText.setAttribute('font-size', `${messageRect.h / 2.5}`);
+    this.messageText.setAttribute('font-size', `${messageRect.h}`);
     this.messageText.setAttribute('font-family', 'Helvetica');
     this.messageText.setAttribute('font-style', 'italic');
     this.messageText.setAttribute('text-anchor', 'middle');
@@ -886,12 +889,15 @@ class Panel {
     return button;
   }
 
-  addLabel(x, y, w, h, label, fontSize, italic = false, centered = False) {
+  addLabel(x, y, w, h, label, fontSize, bold = false, italic = false, centered = False) {
     var labelText = createElement("text");
     labelText.setAttribute('fill', 'white');
     labelText.setAttribute('stroke', 'none');
     labelText.setAttribute('font-size', fontSize);
     labelText.setAttribute('font-family', 'Helvetica');
+    if (bold) {
+      labelText.setAttribute('font-weight', 'bold');
+    }
     if (italic) {
       labelText.setAttribute('font-style', 'italic');
     }
@@ -902,8 +908,9 @@ class Panel {
     } else {
       labelText.setAttribute('x', x);
     }
+    labelText.setAttribute("style", "pointer-events:none");
     labelText.appendChild(document.createTextNode(label));
-    this.mainContainer.appendChild(labelText);
+    this.labelContainer.appendChild(labelText);
   }
 
   addLight(x, y, w, h, number) {

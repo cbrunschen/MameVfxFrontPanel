@@ -21,12 +21,12 @@ SHADE_LIGHT = Shade('light', "#bbbbbb", "#ffffff")
 SHADE_MEDIUM = Shade('medium', "#777777", "#ffffff")
 SHADE_DARK = Shade('dark', "#333333", '#ffffff')
 
-roughDisplayRect = Rect(15, 6.5, 82, 12)
+roughDisplayRect = Rect(37.5, 16.25, 205, 30)
 charRect = Rect(0, 0, 342, 572)
 charsRect = Rect(0, 0, 40 * charRect.w, 2 * charRect.h)
 displayRect = charsRect.fitWithin(roughDisplayRect)
 
-displayGlassRect = Rect(10, -2, 92, 27)
+displayGlassRect = Rect(25, -5, 230, 67.5)
 
 class PanelElement:
   def accept(self, visitor: 'PanelVisitor') -> None:
@@ -34,7 +34,7 @@ class PanelElement:
 
 class PanelVisitor:
   def defaultFontSize(self):
-    return 1.4
+    return 3.5
   
   def load(self, fname):
     p = path.join(path.dirname(path.realpath(__file__)), fname)
@@ -119,6 +119,7 @@ class Label(PanelElement):
   bounds: Rect
   text: str
   fontSize: float
+  bold: bool
   italic: bool
   centered: bool
 
@@ -166,7 +167,7 @@ class Conditional(PanelElement):
 
 @dataclass
 class Panel(PanelElement):
-  fontSize = 1.4
+  fontSize: float
   # these are all internal variables really
   keyboard: str = None
   bounds: Rect = field(default_factory=lambda: Rect(0, 0, 0, 0))
@@ -190,173 +191,173 @@ class Panel(PanelElement):
     self.add(Rectangle(displayGlassRect, '#000000'))
     self.add(Display(displayRect))
 
-    self.addButtonWithLightBelowDisplay(10, 29, "#CartBankSet", 52, SHADE_LIGHT, 0xf)
+    self.addButtonWithLightBelowDisplay(25, 72.5, "#CartBankSet", 52, SHADE_LIGHT, 0xf)
     
     self.onCondition('isSd1')
     if self.isTrue():
-      self.addLabel(10, 35, 6, self.fontSize, "BankSet", centered=True)
+      self.addLabel(25, 87.5, 15, self.fontSize, "BankSet", bold=True, centered=True)
     if self.isFalse():
-      self.addLabel(10, 35, 6, self.fontSize, "Cart", centered=True)
+      self.addLabel(25, 87.5, 15, self.fontSize, "Cart", bold=True, centered=True)
     self.endCondition()
 
-    self.addButtonWithLightBelowDisplay(16, 29, "#Sounds",   53, SHADE_LIGHT, 0xd)
-    self.addLabel(16, 35, 6, self.fontSize, "Sounds", centered=True)
+    self.addButtonWithLightBelowDisplay(40, 72.5, "#Sounds",   53, SHADE_LIGHT, 0xd)
+    self.addLabel(40, 87.5, 15, self.fontSize, "Sounds", bold=True, centered=True)
 
-    self.addButtonWithLightBelowDisplay(22, 29, "#Presets",  54, SHADE_LIGHT, 0x7)
-    self.addLabel(22, 35, 6, self.fontSize, "Presets", centered=True)
+    self.addButtonWithLightBelowDisplay(55, 72.5, "#Presets",  54, SHADE_LIGHT, 0x7)
+    self.addLabel(55, 87.5, 15, self.fontSize, "Presets", bold=True, centered=True)
 
-    self.addButtonWithLightBelowDisplay(42, 29, "#0", 55, SHADE_MEDIUM, 0xe)
-    self.addButtonWithLightBelowDisplay(48, 29, "#1", 56, SHADE_MEDIUM, 0x6)
-    self.addButtonWithLightBelowDisplay(54, 29, "#2", 57, SHADE_MEDIUM, 0x4)
-    self.addButtonWithLightBelowDisplay(60, 29, "#3", 46, SHADE_MEDIUM, 0xc)
-    self.addButtonWithLightBelowDisplay(66, 29, "#4", 47, SHADE_MEDIUM, 0x3)
-    self.addButtonWithLightBelowDisplay(72, 29, "#5", 48, SHADE_MEDIUM, 0xb)
-    self.addButtonWithLightBelowDisplay(78, 29, "#6", 49, SHADE_MEDIUM, 0x2)
-    self.addButtonWithLightBelowDisplay(84, 29, "#7", 35, SHADE_MEDIUM, 0xa)
-    self.addButtonWithLightBelowDisplay(90, 29, "#8", 34, SHADE_MEDIUM, 0x1)
-    self.addButtonWithLightBelowDisplay(96, 29, "#9", 25, SHADE_MEDIUM, 0x9)
+    self.addButtonWithLightBelowDisplay(105, 72.5, "#0", 55, SHADE_MEDIUM, 0xe)
+    self.addButtonWithLightBelowDisplay(120, 72.5, "#1", 56, SHADE_MEDIUM, 0x6)
+    self.addButtonWithLightBelowDisplay(135, 72.5, "#2", 57, SHADE_MEDIUM, 0x4)
+    self.addButtonWithLightBelowDisplay(150, 72.5, "#3", 46, SHADE_MEDIUM, 0xc)
+    self.addButtonWithLightBelowDisplay(165, 72.5, "#4", 47, SHADE_MEDIUM, 0x3)
+    self.addButtonWithLightBelowDisplay(180, 72.5, "#5", 48, SHADE_MEDIUM, 0xb)
+    self.addButtonWithLightBelowDisplay(195, 72.5, "#6", 49, SHADE_MEDIUM, 0x2)
+    self.addButtonWithLightBelowDisplay(210, 72.5, "#7", 35, SHADE_MEDIUM, 0xa)
+    self.addButtonWithLightBelowDisplay(225, 72.5, "#8", 34, SHADE_MEDIUM, 0x1)
+    self.addButtonWithLightBelowDisplay(240, 72.5, "#9", 25, SHADE_MEDIUM, 0x9)
 
-    self.addLabel(42, 35, 6, self.fontSize, "0", centered=True)
-    self.addLabel(48, 35, 6, self.fontSize, "1", centered=True)
-    self.addLabel(54, 35, 6, self.fontSize, "2", centered=True)
-    self.addLabel(60, 35, 6, self.fontSize, "3", centered=True)
-    self.addLabel(66, 35, 6, self.fontSize, "4", centered=True)
-    self.addLabel(72, 35, 6, self.fontSize, "5", centered=True)
-    self.addLabel(78, 35, 6, self.fontSize, "6", centered=True)
-    self.addLabel(84, 35, 6, self.fontSize, "7", centered=True)
-    self.addLabel(90, 35, 6, self.fontSize, "8", centered=True)
-    self.addLabel(96, 35, 6, self.fontSize, "9", centered=True)
+    self.addLabel(105, 87.5, 15, self.fontSize, "0", bold=True, centered=True)
+    self.addLabel(120, 87.5, 15, self.fontSize, "1", bold=True, centered=True)
+    self.addLabel(135, 87.5, 15, self.fontSize, "2", bold=True, centered=True)
+    self.addLabel(150, 87.5, 15, self.fontSize, "3", bold=True, centered=True)
+    self.addLabel(165, 87.5, 15, self.fontSize, "4", bold=True, centered=True)
+    self.addLabel(180, 87.5, 15, self.fontSize, "5", bold=True, centered=True)
+    self.addLabel(195, 87.5, 15, self.fontSize, "6", bold=True, centered=True)
+    self.addLabel(210, 87.5, 15, self.fontSize, "7", bold=True, centered=True)
+    self.addLabel(225, 87.5, 15, self.fontSize, "8", bold=True, centered=True)
+    self.addLabel(240, 87.5, 15, self.fontSize, "9", bold=True, centered=True)
 
     # Large buttons on the main panel part
-    self.addLargeButton         (108, 29, "Replace\nProgram", 29, SHADE_MEDIUM)
+    self.addLargeButton         (270, 72.5, "Replace\nProgram", 29, SHADE_MEDIUM)
 
-    self.addLargeButton         (154, 29, "Select\nVoice", 5, SHADE_MEDIUM)
-    self.addLargeButton         (160, 29, "Copy",          9, SHADE_MEDIUM)
-    self.addLargeButton         (166, 29, "Write",         3, SHADE_MEDIUM)
-    self.addLargeButtonWithLight(172, 29, "Compare",       8, SHADE_MEDIUM, 0x5)
+    self.addLargeButton         (385, 72.5, "Select\nVoice", 5, SHADE_MEDIUM)
+    self.addLargeButton         (400, 72.5, "Copy",          9, SHADE_MEDIUM)
+    self.addLargeButton         (415, 72.5, "Write",         3, SHADE_MEDIUM)
+    self.addLargeButtonWithLight(430, 72.5, "Compare",       8, SHADE_MEDIUM, 0x5)
 
     # Small buttons, main panel
     # -- Performance:
-    self.addSmallButton(108, 20, "Patch\nSelect",   26, SHADE_DARK, True)
-    self.addSmallButton(114, 20, "MIDI",            27, SHADE_DARK, True)
-    self.addSmallButton(120, 20, "Effects",         28, SHADE_DARK, True)
+    self.addSmallButton(270, 50, "Patch\nSelect",   26, SHADE_DARK, True)
+    self.addSmallButton(285, 50, "MIDI",            27, SHADE_DARK, True)
+    self.addSmallButton(300, 50, "Effects",         28, SHADE_DARK, True)
 
-    self.addSmallButton(108, 13, "Key\nZone",       39, SHADE_DARK, False)
-    self.addSmallButton(114, 13, "Trans-\npose",    40, SHADE_DARK, False)
-    self.addSmallButton(120, 13, "Release",         41, SHADE_DARK, False)
+    self.addSmallButton(270, 32.5, "Key\nZone",       39, SHADE_DARK, False)
+    self.addSmallButton(285, 32.5, "Trans-\npose",    40, SHADE_DARK, False)
+    self.addSmallButton(300, 32.5, "Release",         41, SHADE_DARK, False)
 
-    self.addSmallButton(108,  6, "Volume",          36, SHADE_DARK, False)
-    self.addSmallButton(114,  6, "Pan",             37, SHADE_DARK, False)
-    self.addSmallButton(120,  6, "Timbre",          38, SHADE_DARK, False)
+    self.addSmallButton(270,  15, "Volume",          36, SHADE_DARK, False)
+    self.addSmallButton(285,  15, "Pan",             37, SHADE_DARK, False)
+    self.addSmallButton(300,  15, "Timbre",          38, SHADE_DARK, False)
     
     # -- Programming:
-    self.addSmallButton(154, 20, "Wave",             4, SHADE_DARK, False)
-    self.addSmallButton(160, 20, "Mod\nMixer",       6, SHADE_DARK, False)
-    self.addSmallButton(166, 20, "Program\nControl", 2, SHADE_DARK, False)
-    self.addSmallButton(172, 20, "Effects",          7, SHADE_DARK, True)
+    self.addSmallButton(385, 50, "Wave",             4, SHADE_DARK, False)
+    self.addSmallButton(400, 50, "Mod\nMixer",       6, SHADE_DARK, False)
+    self.addSmallButton(415, 50, "Program\nControl", 2, SHADE_DARK, False)
+    self.addSmallButton(430, 50, "Effects",          7, SHADE_DARK, True)
 
-    self.addSmallButton(154, 13, "Pitch",           11, SHADE_DARK, False)
-    self.addSmallButton(160, 13, "Pitch\nMod",      13, SHADE_DARK, False)
-    self.addSmallButton(166, 13, "Filters",         15, SHADE_DARK, True)
-    self.addSmallButton(172, 13, "Output",          17, SHADE_DARK, True)
+    self.addSmallButton(385, 32.5, "Pitch",           11, SHADE_DARK, False)
+    self.addSmallButton(400, 32.5, "Pitch\nMod",      13, SHADE_DARK, False)
+    self.addSmallButton(415, 32.5, "Filters",         15, SHADE_DARK, True)
+    self.addSmallButton(430, 32.5, "Output",          17, SHADE_DARK, True)
 
-    self.addSmallButton(154,  6, "LFO",             10, SHADE_DARK, True)
-    self.addSmallButton(160,  6, "Env1",            12, SHADE_DARK, True)
-    self.addSmallButton(166,  6, "Env2",            14, SHADE_DARK, True)
-    self.addSmallButton(172,  6, "Env3",            16, SHADE_DARK, True)
+    self.addSmallButton(385,  15, "LFO",             10, SHADE_DARK, True)
+    self.addSmallButton(400,  15, "Env1",            12, SHADE_DARK, True)
+    self.addSmallButton(415,  15, "Env2",            14, SHADE_DARK, True)
+    self.addSmallButton(430,  15, "Env3",            16, SHADE_DARK, True)
 
     # Display buttons - approximate:
-    self.addSmallButton(32, 21, "#display_below_left", 50, SHADE_DARK, False)
-    self.addSmallButton(57, 21, "#display_below_middle", 44, SHADE_DARK, False)
-    self.addSmallButton(82, 21, "#display_below_right", 45, SHADE_DARK, False)
+    self.addSmallButton(80, 52.5, "#display_below_left", 50, SHADE_DARK, False)
+    self.addSmallButton(142.5, 52.5, "#display_below_middle", 44, SHADE_DARK, False)
+    self.addSmallButton(200, 52.5, "#display_below_right", 45, SHADE_DARK, False)
 
-    self.addSmallButton(32,  0, "#display_above_left", 58, SHADE_DARK, False)
-    self.addSmallButton(57,  0, "#diplay_above_center", 42, SHADE_DARK, False)
-    self.addSmallButton(82,  0, "#display_above_right", 43, SHADE_DARK, False)
+    self.addSmallButton(80,  0, "#display_above_left", 58, SHADE_DARK, False)
+    self.addSmallButton(142.5,  0, "#diplay_above_center", 42, SHADE_DARK, False)
+    self.addSmallButton(200,  0, "#display_above_right", 43, SHADE_DARK, False)
 
     # Value slider
-    self.addSlider(-8, 4, 3, "data_entry")
+    self.addSlider(-20, 10, 3, "data_entry")
 
     # Increment and Decrement
-    self.addIncDecButton(-17, 22, "#increment", 63, SHADE_DARK, False)
-    self.addIncDecButton(-17, 12, "#decrement", 62, SHADE_DARK, False)
+    self.addIncDecButton(-42.5, 55, "#decrement", 63, SHADE_DARK, False)
+    self.addIncDecButton(-42.5, 30, "#increment", 62, SHADE_DARK, False)
 
-    self.addUpTriangle(-15, 10, 2, 1)
-    self.addDownTriangle(-15, 20, 2, 1)
+    self.addDownTriangle(-37.5, 50, 5, 2.5)
+    self.addUpTriangle(-37.5, 25, 5, 2.5)
 
     # Volume slider
-    self.addSlider(-36, 4, 5, "volume")
+    self.addSlider(-90, 10, 5, "volume")
 
     # The colored lines along the base:
-    self.addAccentColoredLine(-36, 37, 166, 0.5)
-    self.addAccentColoredLine(108, 37, 22, 0.5)
-    self.addAccentColoredLine(131, 37, 22, 0.5)
-    self.addAccentColoredLine(154, 37, 24, 0.5)
+    self.addAccentColoredLine(-90, 92.5, 415, 0.5)
+    self.addAccentColoredLine(270, 92.5, 55, 0.5)
+    self.addAccentColoredLine(327.5, 92.5, 55, 0.5)
+    self.addAccentColoredLine(385, 92.5, 60, 0.5)
 
     # And the labels just above it:
-    self.addLabel(-36, 35, 10, self.fontSize, "Volume")
-    self.addLabel(-17, 35, 10, self.fontSize, "Data Entry")
-    self.addLabel(108, 35, 10, self.fontSize, "Performance")
-    self.addLabel(154, 35, 10, self.fontSize, "Programming")
+    self.addLabel(-90, 87.5, 35, self.fontSize, "Volume", bold=True)
+    self.addLabel(-42.5, 87.5, 35, self.fontSize, "Data Entry", bold=True)
+    self.addLabel(270, 87.5, 35, self.fontSize, "Performance", bold=True)
+    self.addLabel(385, 87.5, 35, self.fontSize, "Programming", bold=True)
 
     # The things that are conditional.
     # When the keyboard has a sequencer:
     self.onCondition("hasSeq")
     if self.isTrue():
-      self.addButtonBelowDisplay     (28, 29, "#Seq",      51, SHADE_LIGHT)
-      self.addLabel(28, 35, 6, self.fontSize, "Seq", centered=True)
+      self.addButtonBelowDisplay     (70, 72.5, "#Seq",      51, SHADE_LIGHT)
+      self.addLabel(70, 87.5, 15, self.fontSize, "Seq", centered=True)
 
-      self.addWhiteLine(114, 29 - 1.5 * self.fontSize - 0.05, 3, 0.1)
-      self.addLabel(117, 29 - 2 * self.fontSize, 6, self.fontSize, "Tracks", centered=True)
-      self.addWhiteLine(123, 29 - 1.5 * self.fontSize - 0.05, 3, 0.1)
-      self.addLargeButtonWithLight(114, 29, "1-6",              30, SHADE_MEDIUM, 0x0, centered=True)
-      self.addLargeButtonWithLight(120, 29, "7-12",             31, SHADE_MEDIUM, 0x8, centered=True)
+      self.addWhiteLine(285, 72.5 - 1.5 * self.fontSize - 0.05, 7.5, 0.25)
+      self.addLabel(292.5, 72.5 - 2 * self.fontSize, 15, self.fontSize, "Tracks", centered=True)
+      self.addWhiteLine(307.5, 72.5 - 1.5 * self.fontSize - 0.05, 7.5, 0.25)
+      self.addLargeButtonWithLight(285, 72.5, "1-6",              30, SHADE_MEDIUM, 0x0, centered=True)
+      self.addLargeButtonWithLight(300, 72.5, "7-12",             31, SHADE_MEDIUM, 0x8, centered=True)
       
       # The 'Master', 'Storage' and 'MIDI Control' buttons are small & at the top,
       # the sequencer buttons are big and at the bottom.
-      self.addLargeButton(131, 29, "Rec",           19, SHADE_MEDIUM)
-      self.addLargeButton(137, 29, "Stop\n/Cont",   22, SHADE_MEDIUM)
-      self.addLargeButton(143, 29, "Play",          23, SHADE_MEDIUM)
+      self.addLargeButton(327.5, 72.5, "Rec",           19, SHADE_MEDIUM)
+      self.addLargeButton(342.5, 72.5, "Stop\n/Cont",   22, SHADE_MEDIUM)
+      self.addLargeButton(357.5, 72.5, "Play",          23, SHADE_MEDIUM)
 
-      self.addSmallButton(131, 20, "Click",         32, SHADE_DARK, False)
-      self.addSmallButton(137, 20, "Seq\nControl",  18, SHADE_DARK, True)
-      self.addSmallButton(143, 20, "Locate",        33, SHADE_DARK, True)
+      self.addSmallButton(327.5, 50, "Click",         32, SHADE_DARK, False)
+      self.addSmallButton(342.5, 50, "Seq\nControl",  18, SHADE_DARK, True)
+      self.addSmallButton(357.5, 50, "Locate",        33, SHADE_DARK, True)
 
-      self.addSmallButton(131, 13, "Song",          60, SHADE_DARK, False)
-      self.addSmallButton(137, 13, "Seq",           59, SHADE_DARK, False)
-      self.addSmallButton(143, 13, "Track",         61, SHADE_DARK, False)
+      self.addSmallButton(327.5, 32.5, "Song",          60, SHADE_DARK, False)
+      self.addSmallButton(342.5, 32.5, "Seq",           59, SHADE_DARK, False)
+      self.addSmallButton(357.5, 32.5, "Track",         61, SHADE_DARK, False)
 
-      self.addSmallButton(131,  6, "Master",        20, SHADE_LIGHT, True)
-      self.addSmallButton(137,  6, "Storage",       21, SHADE_LIGHT, False)
-      self.addSmallButton(143,  6, "MIDI\nControl", 24, SHADE_LIGHT, True)
+      self.addSmallButton(327.5,  15, "Master",        20, SHADE_LIGHT, True)
+      self.addSmallButton(342.5,  15, "Storage",       21, SHADE_LIGHT, False)
+      self.addSmallButton(357.5,  15, "MIDI\nControl", 24, SHADE_LIGHT, True)
 
-      self.addWhiteLine(131, 13 - 1.5 * self.fontSize - 0.05, 7, 0.1)
-      self.addLabel(138, 13 - 2 * self.fontSize, 4, self.fontSize, "Edit", centered=True)
-      self.addWhiteLine(142, 13 - 1.5 * self.fontSize - 0.05, 7, 0.1)
+      self.addWhiteLine(327.5, 32.5 - 1.5 * self.fontSize - 0.05, 17.5, 0.25)
+      self.addLabel(345, 32.5 - 2 * self.fontSize, 10, self.fontSize, "Edit", centered=True)
+      self.addWhiteLine(355, 32.5 - 1.5 * self.fontSize - 0.05, 17.5, 0.25)
 
-      self.addLabel(131, 2-(0.2 + self.fontSize), 10, self.fontSize, "System")
-      self.addAccentColoredLine(131, 2-0.2, 22, 0.2)
-      self.addLabel(131, 35, 10, self.fontSize, "Sequencer")
+      self.addLabel(327.5, 5-(0.5 + self.fontSize), 35, self.fontSize, "System", bold=True)
+      self.addAccentColoredLine(327.5, 5-0.5, 55, 0.5)
+      self.addLabel(327.5, 87.5, 25, self.fontSize, "Sequencer", bold=True)
 
     # When there is no sequencer:
     if self.isFalse():
-      self.addWhiteLine(114, 29 - 1.5 * self.fontSize - 0.05, 4, 0.1)
-      self.addLabel(118, 29 - 2 * self.fontSize, 4, self.fontSize, "Multi", centered=True)
-      self.addWhiteLine(122, 29 - 1.5 * self.fontSize - 0.05, 4, 0.1)
-      self.addLargeButtonWithLight(114, 29, "A",              30, SHADE_MEDIUM, 0x0, centered=True)
-      self.addLargeButtonWithLight(120, 29, "B",              31, SHADE_MEDIUM, 0x8, centered=True)
+      self.addWhiteLine(285, 72.5 - 1.5 * self.fontSize - 0.05, 10, 0.1)
+      self.addLabel(118, 72.5 - 2 * self.fontSize, 10, self.fontSize, "Multi", centered=True)
+      self.addWhiteLine(122, 72.5 - 1.5 * self.fontSize - 0.05, 10, 0.1)
+      self.addLargeButtonWithLight(285, 72.5, "A",              30, SHADE_MEDIUM, 0x0, centered=True)
+      self.addLargeButtonWithLight(300, 72.5, "B",              31, SHADE_MEDIUM, 0x8, centered=True)
 
       # The 'Master', 'Storage' and 'MIDI Control' buttons are large & at the bottom,
       # and there are no sequencer buttons
-      self.addLargeButton(131, 29, "Master",        20, SHADE_LIGHT, True)
-      self.addLargeButton(137, 29, "Storage",       21, SHADE_LIGHT, False)
-      self.addLargeButton(143, 29, "MIDI\nControl", 24, SHADE_LIGHT, True)
+      self.addLargeButton(327.5, 72.5, "Master",        20, SHADE_LIGHT, True)
+      self.addLargeButton(342.5, 72.5, "Storage",       21, SHADE_LIGHT, False)
+      self.addLargeButton(357.5, 72.5, "MIDI\nControl", 24, SHADE_LIGHT, True)
 
-      self.addLabel(131, 35, 10, self.fontSize, "System")
+      self.addLabel(327.5, 87.5, 35, self.fontSize, "System", bold=True)
     self.endCondition()
 
     # Add just a little space around.
-    self.bounds = self.bounds.outset(2, 2)
+    self.bounds = self.bounds.outset(5, 5)
     # Update the background bounds as well.
     self.background.bounds = self.bounds
 
@@ -368,8 +369,8 @@ class Panel(PanelElement):
   def setAccentColor(self, rgb):
     self.add(AccentColor(rgb))
   
-  def addLabel(self, x, y, w, fontSize, label, italic = False, centered = False):      
-    self.add(Label(Rect(x, y, w, fontSize), label, fontSize, italic, centered))
+  def addLabel(self, x, y, w, fontSize, label, bold = False, italic = False, centered = False):      
+    self.add(Label(Rect(x, y, w, fontSize), label, fontSize, bold, italic, centered))
   
   def addButton(self, x, y, w, h, label, labelPosition, value, shade, multiPage = False, lightId = -1):
     button = Button(Rect(x, y, w, h), label, value, shade)
@@ -383,32 +384,32 @@ class Panel(PanelElement):
       
       for i in range(nLines):
         line = labelLines[i]
-        self.addLabel(x, y + y0 + i * self.fontSize, w, self.fontSize, line, italic=True, centered=centered)
+        self.addLabel(x, y + y0 + i * self.fontSize, w, self.fontSize, line, bold=False, italic=True, centered=centered)
     
     if lightId >= 0:
       # Light bounds are relative to button bounds
       button.light = Light(Rect(w/3, h/25, w/3, h/3), lightId)
 
   def addButtonBelowDisplay(self, x, y, label, value, shade):
-    self.addButton(x, y, 6, 4, label, BELOW, value, shade, False, -1)
+    self.addButton(x, y, 15, 10, label, BELOW, value, shade, False, -1)
   
   def addButtonWithLightBelowDisplay(self, x, y, label, value, shade, lightId):
-    self.addButton(x, y, 6, 4, label, BELOW, value, shade, False, lightId)
+    self.addButton(x, y, 15, 10, label, BELOW, value, shade, False, lightId)
   
   def addLargeButton(self, x, y, label, value, shade, multiPage=False):
-    self.addButton(x, y, 6, 4, label, ABOVE, value, shade, False, -1)
+    self.addButton(x, y, 15, 10, label, ABOVE, value, shade, False, -1)
   
   def addLargeButtonWithLight(self, x, y, label, value, shade, lightId, centered=False):
-    self.addButton(x, y, 6, 4, label, ABOVE_CENTERED if centered else ABOVE, value, shade, False, lightId)
+    self.addButton(x, y, 15, 10, label, ABOVE_CENTERED if centered else ABOVE, value, shade, False, lightId)
 
   def addSmallButton(self, x, y, label, value, shade, multiPage):
-    self.addButton(x, y, 6, 2, label, ABOVE, value, shade, multiPage, -1)
+    self.addButton(x, y, 15, 5, label, ABOVE, value, shade, multiPage, -1)
   
   def addIncDecButton(self, x, y, label, value, shade, multiPage):
-    self.addButton(x, y, 6, 2, label, ABOVE_CENTERED, value, shade, multiPage, -1)
+    self.addButton(x, y, 15, 5, label, ABOVE_CENTERED, value, shade, multiPage, -1)
   
   def addSlider(self, x, y, channel, name):
-    self.add(Slider(Rect(x, y, 8, 24), channel, name)) # always 8 wide, 24 tall
+    self.add(Slider(Rect(x, y, 20, 60), channel, name)) # always 20 wide, 60 tall
 
   def addAccentColoredLine(self, x, y, w, h):
     self.add(Rectangle(Rect(x, y, w, h), "accent"))

@@ -18,7 +18,7 @@ class HTMLJSVisitor(PanelVisitor):
     self.indent = self.indent.removeprefix('  ')
   
   def defaultFontSize(self):
-    return 1.4
+    return 3.5
 
   def append(self, s):
     self.code.append(indent(s, self.indent))
@@ -68,9 +68,10 @@ class HTMLJSVisitor(PanelVisitor):
       self.append(f'{addButton};')
 
   def visitLabel(self, label: 'Label'):
+    bold = 'true' if label.bold else 'false'
     italic = 'true' if label.italic else 'false'
     centered = 'true' if label.centered else 'false'
-    self.append(f'this.addLabel({label.bounds.coords()}, "{label.text}", {label.fontSize}, {italic}, {centered});')
+    self.append(f'this.addLabel({label.bounds.coords()}, "{label.text}", {label.fontSize}, {bold}, {italic}, {centered});')
 
   def visitSlider(self, slider: 'Slider'):
     self.append(f'this.addSlider({slider.bounds.coords()}, {slider.channel}, 0.5);')
