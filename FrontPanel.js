@@ -409,24 +409,24 @@ class Rect {
   }
 }
 
-displayRect = new Rect(15, 6.5, 82, 12);
-displayGlassRect = new Rect(10, -2, 92, 27);
+displayRect = new Rect(37.5, 16.25, 205, 30);
+displayGlassRect = new Rect(25, -5, 230, 67.5);
 
 class Button {
   constructor(x, y, w, h, number, color) {
     var that = this;
     this.rect = new Rect(x, y, w, h);
 
-    var rect = this.rect.inset(0.1, 0.1);
+    var rect = this.rect.inset(0.25, 0.25);
     var translation = "translate(" + x + "," + y + ")";
-    this.halo = rect.toPath(0.5);
+    this.halo = rect.toPath(1.25);
     this.halo.setAttribute("stroke", "#666666");
-    this.halo.setAttribute("stroke-width", "2");
+    this.halo.setAttribute("stroke-width", "5");
     this.halo.setAttribute("fill", "none");
     hideElement(this.halo);
 
-    rect = new Rect(0, 0, w, h).inset(0.1, 0.1);
-    this.outline = rect.toPath(0.5);
+    rect = rect.offset(-rect.x, -rect.y)
+    this.outline = rect.toPath(1.25);
     this.outline.setAttribute("fill", color);
     this.outline.setAttribute("stroke", "none");
 
@@ -564,23 +564,23 @@ class Slider {
 
     this.frameColor = "#333333";
     this.frameActiveColor = "#666666";
-    this.frame = rect.inset(0.25, 0.25).toPath();
+    this.frame = rect.inset(0.625, 0.625).toPath();
     this.frame.setAttribute("stroke", this.frameColor);
-    this.frame.setAttribute("stroke-width", "0.5");
+    this.frame.setAttribute("stroke-width", "1.25");
     this.group.appendChild(this.frame);
 
-    this.handleX = 0.75;
-    this.handleW = w - 1.5;
-    this.handleH = 4;
-    this.handleMinY = 0.75;
-    this.handleMaxY = h - 1.5 - this.handleH;
+    this.handleX = 1.875;
+    this.handleW = w - 3.75;
+    this.handleH = 10;
+    this.handleMinY = 2.875;
+    this.handleMaxY = h - 3.75 - this.handleH;
 
     this.handle = createElement("g");
     this.handle.appendChild(makeRectPath(0, 0, this.handleW, this.handleH, "#333333"));
-    this.handle.appendChild(makeRectPath(0, 0, this.handleW, 0.75, "#444444"));
-    this.handle.appendChild(makeRectPath(0, 1.75, this.handleW, 0.25, "#222222"));
-    this.handle.appendChild(makeRectPath(0, 2, this.handleW, 0.25, "#444444"));
-    this.handle.appendChild(makeRectPath(0, 3.25, this.handleW, 0.75, "#222222"));
+    this.handle.appendChild(makeRectPath(0, 0, this.handleW, 1.875, "#444444"));
+    this.handle.appendChild(makeRectPath(0, 4.375, this.handleW, 0.625, "#222222"));
+    this.handle.appendChild(makeRectPath(0, 5, this.handleW, 0.625, "#444444"));
+    this.handle.appendChild(makeRectPath(0, 8.175, this.handleW, 1.875, "#222222"));
     this.group.appendChild(this.handle);
 
     this.setValue(value);
@@ -730,6 +730,9 @@ class Panel {
     this.haloContainer = createElement("g");
     this.container.appendChild(this.haloContainer);
 
+    this.labelContainer = createElement("g");
+    this.container.appendChild(this.labelContainer);
+
     this.mainContainer = createElement("g");
     this.container.appendChild(this.mainContainer);
 
@@ -764,7 +767,7 @@ class Panel {
 
     this.messageText.setAttribute('fill', "#aaaaaaff");
     this.messageText.setAttribute('stroke', 'none');
-    this.messageText.setAttribute('font-size', `${messageRect.h / 2.5}`);
+    this.messageText.setAttribute('font-size', `${messageRect.h}`);
     this.messageText.setAttribute('font-family', 'Helvetica');
     this.messageText.setAttribute('font-style', 'italic');
     this.messageText.setAttribute('text-anchor', 'middle');
@@ -886,12 +889,15 @@ class Panel {
     return button;
   }
 
-  addLabel(x, y, w, h, label, fontSize, italic = false, centered = False) {
+  addLabel(x, y, w, h, label, fontSize, bold = false, italic = false, centered = False) {
     var labelText = createElement("text");
     labelText.setAttribute('fill', 'white');
     labelText.setAttribute('stroke', 'none');
     labelText.setAttribute('font-size', fontSize);
     labelText.setAttribute('font-family', 'Helvetica');
+    if (bold) {
+      labelText.setAttribute('font-weight', 'bold');
+    }
     if (italic) {
       labelText.setAttribute('font-style', 'italic');
     }
@@ -902,8 +908,9 @@ class Panel {
     } else {
       labelText.setAttribute('x', x);
     }
+    labelText.setAttribute("style", "pointer-events:none");
     labelText.appendChild(document.createTextNode(label));
-    this.mainContainer.appendChild(labelText);
+    this.labelContainer.appendChild(labelText);
   }
 
   addLight(x, y, w, h, number) {
@@ -977,189 +984,189 @@ class Panel {
     } else { // not isSd1
       this.accentColor = "#299ca3";
     }
-    this.addRectangle(-38, -4, 218, 43.5, "#222222");
-    this.addRectangle(10, -2, 92, 27, "#000000");
+    this.addRectangle(-95, -10, 545, 108, "#222222");
+    this.addRectangle(25, -5, 230, 67.5, "#000000");
 
     this.displayContainer = createElement("svg");
     this.display = new Display(this.displayContainer, 2, 40);
     this.displayContainer.setAttribute("preserveAspectRatio", "xMidYMid meet");
-    this.displayContainer.setAttribute("x", 15.0);
-    this.displayContainer.setAttribute("y", 9.071345029239765);
-    this.displayContainer.setAttribute("width", 82.0);
-    this.displayContainer.setAttribute("height", 6.857309941520468);
+    this.displayContainer.setAttribute("x", 37.5);
+    this.displayContainer.setAttribute("y", 22.678362573099413);
+    this.displayContainer.setAttribute("width", 205.0);
+    this.displayContainer.setAttribute("height", 17.14327485380117);
     this.container.appendChild(this.displayContainer);
 
-    this.addButton(10, 29, 6, 4, 52, Shade.LIGHT).addLight(this.addLight(2, 0.16, 2, 1.3333, 15));
+    this.addButton(25, 72.5, 15, 10, 52, Shade.LIGHT).addLight(this.addLight(5, 0.4, 5, 3.3333, 15));
     if (isSd1) {
-      this.addLabel(10, 35, 6, 1.4, "BankSet", 1.4, false, true);
+      this.addLabel(25, 87.5, 15, 3.5, "BankSet", 3.5, true, false, true);
     } else { // not isSd1
-      this.addLabel(10, 35, 6, 1.4, "Cart", 1.4, false, true);
+      this.addLabel(25, 87.5, 15, 3.5, "Cart", 3.5, true, false, true);
     }
-    this.addButton(16, 29, 6, 4, 53, Shade.LIGHT).addLight(this.addLight(2, 0.16, 2, 1.3333, 13));
-    this.addLabel(16, 35, 6, 1.4, "Sounds", 1.4, false, true);
-    this.addButton(22, 29, 6, 4, 54, Shade.LIGHT).addLight(this.addLight(2, 0.16, 2, 1.3333, 7));
-    this.addLabel(22, 35, 6, 1.4, "Presets", 1.4, false, true);
-    this.addButton(42, 29, 6, 4, 55, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 14));
-    this.addButton(48, 29, 6, 4, 56, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 6));
-    this.addButton(54, 29, 6, 4, 57, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 4));
-    this.addButton(60, 29, 6, 4, 46, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 12));
-    this.addButton(66, 29, 6, 4, 47, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 3));
-    this.addButton(72, 29, 6, 4, 48, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 11));
-    this.addButton(78, 29, 6, 4, 49, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 2));
-    this.addButton(84, 29, 6, 4, 35, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 10));
-    this.addButton(90, 29, 6, 4, 34, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 1));
-    this.addButton(96, 29, 6, 4, 25, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 9));
-    this.addLabel(42, 35, 6, 1.4, "0", 1.4, false, true);
-    this.addLabel(48, 35, 6, 1.4, "1", 1.4, false, true);
-    this.addLabel(54, 35, 6, 1.4, "2", 1.4, false, true);
-    this.addLabel(60, 35, 6, 1.4, "3", 1.4, false, true);
-    this.addLabel(66, 35, 6, 1.4, "4", 1.4, false, true);
-    this.addLabel(72, 35, 6, 1.4, "5", 1.4, false, true);
-    this.addLabel(78, 35, 6, 1.4, "6", 1.4, false, true);
-    this.addLabel(84, 35, 6, 1.4, "7", 1.4, false, true);
-    this.addLabel(90, 35, 6, 1.4, "8", 1.4, false, true);
-    this.addLabel(96, 35, 6, 1.4, "9", 1.4, false, true);
-    this.addButton(108, 29, 6, 4, 29, Shade.MEDIUM);
-    this.addLabel(108, 26.2, 6, 1.4, "Replace", 1.4, true, false);
-    this.addLabel(108, 27.6, 6, 1.4, "Program", 1.4, true, false);
-    this.addButton(154, 29, 6, 4, 5, Shade.MEDIUM);
-    this.addLabel(154, 26.2, 6, 1.4, "Select", 1.4, true, false);
-    this.addLabel(154, 27.6, 6, 1.4, "Voice", 1.4, true, false);
-    this.addButton(160, 29, 6, 4, 9, Shade.MEDIUM);
-    this.addLabel(160, 27.6, 6, 1.4, "Copy", 1.4, true, false);
-    this.addButton(166, 29, 6, 4, 3, Shade.MEDIUM);
-    this.addLabel(166, 27.6, 6, 1.4, "Write", 1.4, true, false);
-    this.addButton(172, 29, 6, 4, 8, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 5));
-    this.addLabel(172, 27.6, 6, 1.4, "Compare", 1.4, true, false);
-    this.addButton(108, 20, 6, 2, 26, Shade.DARK);
-    this.addLabel(108, 17.2, 6, 1.4, "Patch", 1.4, true, false);
-    this.addLabel(108, 18.6, 6, 1.4, "Select", 1.4, true, false);
-    this.addButton(114, 20, 6, 2, 27, Shade.DARK);
-    this.addLabel(114, 18.6, 6, 1.4, "MIDI", 1.4, true, false);
-    this.addButton(120, 20, 6, 2, 28, Shade.DARK);
-    this.addLabel(120, 18.6, 6, 1.4, "Effects", 1.4, true, false);
-    this.addButton(108, 13, 6, 2, 39, Shade.DARK);
-    this.addLabel(108, 10.2, 6, 1.4, "Key", 1.4, true, false);
-    this.addLabel(108, 11.6, 6, 1.4, "Zone", 1.4, true, false);
-    this.addButton(114, 13, 6, 2, 40, Shade.DARK);
-    this.addLabel(114, 10.2, 6, 1.4, "Trans-", 1.4, true, false);
-    this.addLabel(114, 11.6, 6, 1.4, "pose", 1.4, true, false);
-    this.addButton(120, 13, 6, 2, 41, Shade.DARK);
-    this.addLabel(120, 11.6, 6, 1.4, "Release", 1.4, true, false);
-    this.addButton(108, 6, 6, 2, 36, Shade.DARK);
-    this.addLabel(108, 4.6, 6, 1.4, "Volume", 1.4, true, false);
-    this.addButton(114, 6, 6, 2, 37, Shade.DARK);
-    this.addLabel(114, 4.6, 6, 1.4, "Pan", 1.4, true, false);
-    this.addButton(120, 6, 6, 2, 38, Shade.DARK);
-    this.addLabel(120, 4.6, 6, 1.4, "Timbre", 1.4, true, false);
-    this.addButton(154, 20, 6, 2, 4, Shade.DARK);
-    this.addLabel(154, 18.6, 6, 1.4, "Wave", 1.4, true, false);
-    this.addButton(160, 20, 6, 2, 6, Shade.DARK);
-    this.addLabel(160, 17.2, 6, 1.4, "Mod", 1.4, true, false);
-    this.addLabel(160, 18.6, 6, 1.4, "Mixer", 1.4, true, false);
-    this.addButton(166, 20, 6, 2, 2, Shade.DARK);
-    this.addLabel(166, 17.2, 6, 1.4, "Program", 1.4, true, false);
-    this.addLabel(166, 18.6, 6, 1.4, "Control", 1.4, true, false);
-    this.addButton(172, 20, 6, 2, 7, Shade.DARK);
-    this.addLabel(172, 18.6, 6, 1.4, "Effects", 1.4, true, false);
-    this.addButton(154, 13, 6, 2, 11, Shade.DARK);
-    this.addLabel(154, 11.6, 6, 1.4, "Pitch", 1.4, true, false);
-    this.addButton(160, 13, 6, 2, 13, Shade.DARK);
-    this.addLabel(160, 10.2, 6, 1.4, "Pitch", 1.4, true, false);
-    this.addLabel(160, 11.6, 6, 1.4, "Mod", 1.4, true, false);
-    this.addButton(166, 13, 6, 2, 15, Shade.DARK);
-    this.addLabel(166, 11.6, 6, 1.4, "Filters", 1.4, true, false);
-    this.addButton(172, 13, 6, 2, 17, Shade.DARK);
-    this.addLabel(172, 11.6, 6, 1.4, "Output", 1.4, true, false);
-    this.addButton(154, 6, 6, 2, 10, Shade.DARK);
-    this.addLabel(154, 4.6, 6, 1.4, "LFO", 1.4, true, false);
-    this.addButton(160, 6, 6, 2, 12, Shade.DARK);
-    this.addLabel(160, 4.6, 6, 1.4, "Env1", 1.4, true, false);
-    this.addButton(166, 6, 6, 2, 14, Shade.DARK);
-    this.addLabel(166, 4.6, 6, 1.4, "Env2", 1.4, true, false);
-    this.addButton(172, 6, 6, 2, 16, Shade.DARK);
-    this.addLabel(172, 4.6, 6, 1.4, "Env3", 1.4, true, false);
-    this.addButton(32, 21, 6, 2, 50, Shade.DARK);
-    this.addButton(57, 21, 6, 2, 44, Shade.DARK);
-    this.addButton(82, 21, 6, 2, 45, Shade.DARK);
-    this.addButton(32, 0, 6, 2, 58, Shade.DARK);
-    this.addButton(57, 0, 6, 2, 42, Shade.DARK);
-    this.addButton(82, 0, 6, 2, 43, Shade.DARK);
-    this.addSlider(-8, 4, 8, 24, 3, 0.5);
-    this.addButton(-17, 22, 6, 2, 63, Shade.DARK);
-    this.addButton(-17, 12, 6, 2, 62, Shade.DARK);
-    this.addSymbol(-15, 10, 2, 1, "triangle_up");
-    this.addSymbol(-15, 20, 2, 1, "triangle_down");
-    this.addSlider(-36, 4, 8, 24, 5, 0.5);
-    this.addRectangle(-36, 37, 166, 0.5, this.accentColor);
-    this.addRectangle(108, 37, 22, 0.5, this.accentColor);
-    this.addRectangle(131, 37, 22, 0.5, this.accentColor);
-    this.addRectangle(154, 37, 24, 0.5, this.accentColor);
-    this.addLabel(-36, 35, 10, 1.4, "Volume", 1.4, false, false);
-    this.addLabel(-17, 35, 10, 1.4, "Data Entry", 1.4, false, false);
-    this.addLabel(108, 35, 10, 1.4, "Performance", 1.4, false, false);
-    this.addLabel(154, 35, 10, 1.4, "Programming", 1.4, false, false);
+    this.addButton(40, 72.5, 15, 10, 53, Shade.LIGHT).addLight(this.addLight(5, 0.4, 5, 3.3333, 13));
+    this.addLabel(40, 87.5, 15, 3.5, "Sounds", 3.5, true, false, true);
+    this.addButton(55, 72.5, 15, 10, 54, Shade.LIGHT).addLight(this.addLight(5, 0.4, 5, 3.3333, 7));
+    this.addLabel(55, 87.5, 15, 3.5, "Presets", 3.5, true, false, true);
+    this.addButton(105, 72.5, 15, 10, 55, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 14));
+    this.addButton(120, 72.5, 15, 10, 56, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 6));
+    this.addButton(135, 72.5, 15, 10, 57, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 4));
+    this.addButton(150, 72.5, 15, 10, 46, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 12));
+    this.addButton(165, 72.5, 15, 10, 47, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 3));
+    this.addButton(180, 72.5, 15, 10, 48, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 11));
+    this.addButton(195, 72.5, 15, 10, 49, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 2));
+    this.addButton(210, 72.5, 15, 10, 35, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 10));
+    this.addButton(225, 72.5, 15, 10, 34, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 1));
+    this.addButton(240, 72.5, 15, 10, 25, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 9));
+    this.addLabel(105, 87.5, 15, 3.5, "0", 3.5, true, false, true);
+    this.addLabel(120, 87.5, 15, 3.5, "1", 3.5, true, false, true);
+    this.addLabel(135, 87.5, 15, 3.5, "2", 3.5, true, false, true);
+    this.addLabel(150, 87.5, 15, 3.5, "3", 3.5, true, false, true);
+    this.addLabel(165, 87.5, 15, 3.5, "4", 3.5, true, false, true);
+    this.addLabel(180, 87.5, 15, 3.5, "5", 3.5, true, false, true);
+    this.addLabel(195, 87.5, 15, 3.5, "6", 3.5, true, false, true);
+    this.addLabel(210, 87.5, 15, 3.5, "7", 3.5, true, false, true);
+    this.addLabel(225, 87.5, 15, 3.5, "8", 3.5, true, false, true);
+    this.addLabel(240, 87.5, 15, 3.5, "9", 3.5, true, false, true);
+    this.addButton(270, 72.5, 15, 10, 29, Shade.MEDIUM);
+    this.addLabel(270, 65.5, 15, 3.5, "Replace", 3.5, false, true, false);
+    this.addLabel(270, 69, 15, 3.5, "Program", 3.5, false, true, false);
+    this.addButton(385, 72.5, 15, 10, 5, Shade.MEDIUM);
+    this.addLabel(385, 65.5, 15, 3.5, "Select", 3.5, false, true, false);
+    this.addLabel(385, 69, 15, 3.5, "Voice", 3.5, false, true, false);
+    this.addButton(400, 72.5, 15, 10, 9, Shade.MEDIUM);
+    this.addLabel(400, 69, 15, 3.5, "Copy", 3.5, false, true, false);
+    this.addButton(415, 72.5, 15, 10, 3, Shade.MEDIUM);
+    this.addLabel(415, 69, 15, 3.5, "Write", 3.5, false, true, false);
+    this.addButton(430, 72.5, 15, 10, 8, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 5));
+    this.addLabel(430, 69, 15, 3.5, "Compare", 3.5, false, true, false);
+    this.addButton(270, 50, 15, 5, 26, Shade.DARK);
+    this.addLabel(270, 43, 15, 3.5, "Patch", 3.5, false, true, false);
+    this.addLabel(270, 46.5, 15, 3.5, "Select", 3.5, false, true, false);
+    this.addButton(285, 50, 15, 5, 27, Shade.DARK);
+    this.addLabel(285, 46.5, 15, 3.5, "MIDI", 3.5, false, true, false);
+    this.addButton(300, 50, 15, 5, 28, Shade.DARK);
+    this.addLabel(300, 46.5, 15, 3.5, "Effects", 3.5, false, true, false);
+    this.addButton(270, 32.5, 15, 5, 39, Shade.DARK);
+    this.addLabel(270, 25.5, 15, 3.5, "Key", 3.5, false, true, false);
+    this.addLabel(270, 29, 15, 3.5, "Zone", 3.5, false, true, false);
+    this.addButton(285, 32.5, 15, 5, 40, Shade.DARK);
+    this.addLabel(285, 25.5, 15, 3.5, "Trans-", 3.5, false, true, false);
+    this.addLabel(285, 29, 15, 3.5, "pose", 3.5, false, true, false);
+    this.addButton(300, 32.5, 15, 5, 41, Shade.DARK);
+    this.addLabel(300, 29, 15, 3.5, "Release", 3.5, false, true, false);
+    this.addButton(270, 15, 15, 5, 36, Shade.DARK);
+    this.addLabel(270, 11.5, 15, 3.5, "Volume", 3.5, false, true, false);
+    this.addButton(285, 15, 15, 5, 37, Shade.DARK);
+    this.addLabel(285, 11.5, 15, 3.5, "Pan", 3.5, false, true, false);
+    this.addButton(300, 15, 15, 5, 38, Shade.DARK);
+    this.addLabel(300, 11.5, 15, 3.5, "Timbre", 3.5, false, true, false);
+    this.addButton(385, 50, 15, 5, 4, Shade.DARK);
+    this.addLabel(385, 46.5, 15, 3.5, "Wave", 3.5, false, true, false);
+    this.addButton(400, 50, 15, 5, 6, Shade.DARK);
+    this.addLabel(400, 43, 15, 3.5, "Mod", 3.5, false, true, false);
+    this.addLabel(400, 46.5, 15, 3.5, "Mixer", 3.5, false, true, false);
+    this.addButton(415, 50, 15, 5, 2, Shade.DARK);
+    this.addLabel(415, 43, 15, 3.5, "Program", 3.5, false, true, false);
+    this.addLabel(415, 46.5, 15, 3.5, "Control", 3.5, false, true, false);
+    this.addButton(430, 50, 15, 5, 7, Shade.DARK);
+    this.addLabel(430, 46.5, 15, 3.5, "Effects", 3.5, false, true, false);
+    this.addButton(385, 32.5, 15, 5, 11, Shade.DARK);
+    this.addLabel(385, 29, 15, 3.5, "Pitch", 3.5, false, true, false);
+    this.addButton(400, 32.5, 15, 5, 13, Shade.DARK);
+    this.addLabel(400, 25.5, 15, 3.5, "Pitch", 3.5, false, true, false);
+    this.addLabel(400, 29, 15, 3.5, "Mod", 3.5, false, true, false);
+    this.addButton(415, 32.5, 15, 5, 15, Shade.DARK);
+    this.addLabel(415, 29, 15, 3.5, "Filters", 3.5, false, true, false);
+    this.addButton(430, 32.5, 15, 5, 17, Shade.DARK);
+    this.addLabel(430, 29, 15, 3.5, "Output", 3.5, false, true, false);
+    this.addButton(385, 15, 15, 5, 10, Shade.DARK);
+    this.addLabel(385, 11.5, 15, 3.5, "LFO", 3.5, false, true, false);
+    this.addButton(400, 15, 15, 5, 12, Shade.DARK);
+    this.addLabel(400, 11.5, 15, 3.5, "Env1", 3.5, false, true, false);
+    this.addButton(415, 15, 15, 5, 14, Shade.DARK);
+    this.addLabel(415, 11.5, 15, 3.5, "Env2", 3.5, false, true, false);
+    this.addButton(430, 15, 15, 5, 16, Shade.DARK);
+    this.addLabel(430, 11.5, 15, 3.5, "Env3", 3.5, false, true, false);
+    this.addButton(80, 52.5, 15, 5, 50, Shade.DARK);
+    this.addButton(142.5, 52.5, 15, 5, 44, Shade.DARK);
+    this.addButton(200, 52.5, 15, 5, 45, Shade.DARK);
+    this.addButton(80, 0, 15, 5, 58, Shade.DARK);
+    this.addButton(142.5, 0, 15, 5, 42, Shade.DARK);
+    this.addButton(200, 0, 15, 5, 43, Shade.DARK);
+    this.addSlider(-20, 10, 20, 60, 3, 0.5);
+    this.addButton(-42.5, 55, 15, 5, 63, Shade.DARK);
+    this.addButton(-42.5, 30, 15, 5, 62, Shade.DARK);
+    this.addSymbol(-37.5, 50, 5, 2.5, "triangle_down");
+    this.addSymbol(-37.5, 25, 5, 2.5, "triangle_up");
+    this.addSlider(-90, 10, 20, 60, 5, 0.5);
+    this.addRectangle(-90, 92.5, 415, 0.5, this.accentColor);
+    this.addRectangle(270, 92.5, 55, 0.5, this.accentColor);
+    this.addRectangle(327.5, 92.5, 55, 0.5, this.accentColor);
+    this.addRectangle(385, 92.5, 60, 0.5, this.accentColor);
+    this.addLabel(-90, 87.5, 35, 3.5, "Volume", 3.5, true, false, false);
+    this.addLabel(-42.5, 87.5, 35, 3.5, "Data Entry", 3.5, true, false, false);
+    this.addLabel(270, 87.5, 35, 3.5, "Performance", 3.5, true, false, false);
+    this.addLabel(385, 87.5, 35, 3.5, "Programming", 3.5, true, false, false);
     if (hasSeq) {
-      this.addButton(28, 29, 6, 4, 51, Shade.LIGHT);
-      this.addLabel(28, 35, 6, 1.4, "Seq", 1.4, false, true);
-      this.addRectangle(114, 26.85, 3, 0.1, "#ffffff");
-      this.addLabel(117, 26.2, 6, 1.4, "Tracks", 1.4, false, true);
-      this.addRectangle(123, 26.85, 3, 0.1, "#ffffff");
-      this.addButton(114, 29, 6, 4, 30, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 0));
-      this.addLabel(114, 27.6, 6, 1.4, "1-6", 1.4, true, true);
-      this.addButton(120, 29, 6, 4, 31, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 8));
-      this.addLabel(120, 27.6, 6, 1.4, "7-12", 1.4, true, true);
-      this.addButton(131, 29, 6, 4, 19, Shade.MEDIUM);
-      this.addLabel(131, 27.6, 6, 1.4, "Rec", 1.4, true, false);
-      this.addButton(137, 29, 6, 4, 22, Shade.MEDIUM);
-      this.addLabel(137, 26.2, 6, 1.4, "Stop", 1.4, true, false);
-      this.addLabel(137, 27.6, 6, 1.4, "/Cont", 1.4, true, false);
-      this.addButton(143, 29, 6, 4, 23, Shade.MEDIUM);
-      this.addLabel(143, 27.6, 6, 1.4, "Play", 1.4, true, false);
-      this.addButton(131, 20, 6, 2, 32, Shade.DARK);
-      this.addLabel(131, 18.6, 6, 1.4, "Click", 1.4, true, false);
-      this.addButton(137, 20, 6, 2, 18, Shade.DARK);
-      this.addLabel(137, 17.2, 6, 1.4, "Seq", 1.4, true, false);
-      this.addLabel(137, 18.6, 6, 1.4, "Control", 1.4, true, false);
-      this.addButton(143, 20, 6, 2, 33, Shade.DARK);
-      this.addLabel(143, 18.6, 6, 1.4, "Locate", 1.4, true, false);
-      this.addButton(131, 13, 6, 2, 60, Shade.DARK);
-      this.addLabel(131, 11.6, 6, 1.4, "Song", 1.4, true, false);
-      this.addButton(137, 13, 6, 2, 59, Shade.DARK);
-      this.addLabel(137, 11.6, 6, 1.4, "Seq", 1.4, true, false);
-      this.addButton(143, 13, 6, 2, 61, Shade.DARK);
-      this.addLabel(143, 11.6, 6, 1.4, "Track", 1.4, true, false);
-      this.addButton(131, 6, 6, 2, 20, Shade.LIGHT);
-      this.addLabel(131, 4.6, 6, 1.4, "Master", 1.4, true, false);
-      this.addButton(137, 6, 6, 2, 21, Shade.LIGHT);
-      this.addLabel(137, 4.6, 6, 1.4, "Storage", 1.4, true, false);
-      this.addButton(143, 6, 6, 2, 24, Shade.LIGHT);
-      this.addLabel(143, 3.2, 6, 1.4, "MIDI", 1.4, true, false);
-      this.addLabel(143, 4.6, 6, 1.4, "Control", 1.4, true, false);
-      this.addRectangle(131, 10.85, 7, 0.1, "#ffffff");
-      this.addLabel(138, 10.2, 4, 1.4, "Edit", 1.4, false, true);
-      this.addRectangle(142, 10.85, 7, 0.1, "#ffffff");
-      this.addLabel(131, 0.4, 10, 1.4, "System", 1.4, false, false);
-      this.addRectangle(131, 1.8, 22, 0.2, this.accentColor);
-      this.addLabel(131, 35, 10, 1.4, "Sequencer", 1.4, false, false);
+      this.addButton(70, 72.5, 15, 10, 51, Shade.LIGHT);
+      this.addLabel(70, 87.5, 15, 3.5, "Seq", 3.5, false, false, true);
+      this.addRectangle(285, 67.2, 7.5, 0.25, "#ffffff");
+      this.addLabel(292.5, 65.5, 15, 3.5, "Tracks", 3.5, false, false, true);
+      this.addRectangle(307.5, 67.2, 7.5, 0.25, "#ffffff");
+      this.addButton(285, 72.5, 15, 10, 30, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 0));
+      this.addLabel(285, 69, 15, 3.5, "1-6", 3.5, false, true, true);
+      this.addButton(300, 72.5, 15, 10, 31, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 8));
+      this.addLabel(300, 69, 15, 3.5, "7-12", 3.5, false, true, true);
+      this.addButton(327.5, 72.5, 15, 10, 19, Shade.MEDIUM);
+      this.addLabel(327.5, 69, 15, 3.5, "Rec", 3.5, false, true, false);
+      this.addButton(342.5, 72.5, 15, 10, 22, Shade.MEDIUM);
+      this.addLabel(342.5, 65.5, 15, 3.5, "Stop", 3.5, false, true, false);
+      this.addLabel(342.5, 69, 15, 3.5, "/Cont", 3.5, false, true, false);
+      this.addButton(357.5, 72.5, 15, 10, 23, Shade.MEDIUM);
+      this.addLabel(357.5, 69, 15, 3.5, "Play", 3.5, false, true, false);
+      this.addButton(327.5, 50, 15, 5, 32, Shade.DARK);
+      this.addLabel(327.5, 46.5, 15, 3.5, "Click", 3.5, false, true, false);
+      this.addButton(342.5, 50, 15, 5, 18, Shade.DARK);
+      this.addLabel(342.5, 43, 15, 3.5, "Seq", 3.5, false, true, false);
+      this.addLabel(342.5, 46.5, 15, 3.5, "Control", 3.5, false, true, false);
+      this.addButton(357.5, 50, 15, 5, 33, Shade.DARK);
+      this.addLabel(357.5, 46.5, 15, 3.5, "Locate", 3.5, false, true, false);
+      this.addButton(327.5, 32.5, 15, 5, 60, Shade.DARK);
+      this.addLabel(327.5, 29, 15, 3.5, "Song", 3.5, false, true, false);
+      this.addButton(342.5, 32.5, 15, 5, 59, Shade.DARK);
+      this.addLabel(342.5, 29, 15, 3.5, "Seq", 3.5, false, true, false);
+      this.addButton(357.5, 32.5, 15, 5, 61, Shade.DARK);
+      this.addLabel(357.5, 29, 15, 3.5, "Track", 3.5, false, true, false);
+      this.addButton(327.5, 15, 15, 5, 20, Shade.LIGHT);
+      this.addLabel(327.5, 11.5, 15, 3.5, "Master", 3.5, false, true, false);
+      this.addButton(342.5, 15, 15, 5, 21, Shade.LIGHT);
+      this.addLabel(342.5, 11.5, 15, 3.5, "Storage", 3.5, false, true, false);
+      this.addButton(357.5, 15, 15, 5, 24, Shade.LIGHT);
+      this.addLabel(357.5, 8, 15, 3.5, "MIDI", 3.5, false, true, false);
+      this.addLabel(357.5, 11.5, 15, 3.5, "Control", 3.5, false, true, false);
+      this.addRectangle(327.5, 27.2, 17.5, 0.25, "#ffffff");
+      this.addLabel(345, 25.5, 10, 3.5, "Edit", 3.5, false, false, true);
+      this.addRectangle(355, 27.2, 17.5, 0.25, "#ffffff");
+      this.addLabel(327.5, 1, 35, 3.5, "System", 3.5, true, false, false);
+      this.addRectangle(327.5, 4.5, 55, 0.5, this.accentColor);
+      this.addLabel(327.5, 87.5, 25, 3.5, "Sequencer", 3.5, true, false, false);
     } else { // not hasSeq
-      this.addRectangle(114, 26.85, 4, 0.1, "#ffffff");
-      this.addLabel(118, 26.2, 4, 1.4, "Multi", 1.4, false, true);
-      this.addRectangle(122, 26.85, 4, 0.1, "#ffffff");
-      this.addButton(114, 29, 6, 4, 30, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 0));
-      this.addLabel(114, 27.6, 6, 1.4, "A", 1.4, true, true);
-      this.addButton(120, 29, 6, 4, 31, Shade.MEDIUM).addLight(this.addLight(2, 0.16, 2, 1.3333, 8));
-      this.addLabel(120, 27.6, 6, 1.4, "B", 1.4, true, true);
-      this.addButton(131, 29, 6, 4, 20, Shade.LIGHT);
-      this.addLabel(131, 27.6, 6, 1.4, "Master", 1.4, true, false);
-      this.addButton(137, 29, 6, 4, 21, Shade.LIGHT);
-      this.addLabel(137, 27.6, 6, 1.4, "Storage", 1.4, true, false);
-      this.addButton(143, 29, 6, 4, 24, Shade.LIGHT);
-      this.addLabel(143, 26.2, 6, 1.4, "MIDI", 1.4, true, false);
-      this.addLabel(143, 27.6, 6, 1.4, "Control", 1.4, true, false);
-      this.addLabel(131, 35, 10, 1.4, "System", 1.4, false, false);
+      this.addRectangle(285, 67.2, 10, 0.1, "#ffffff");
+      this.addLabel(118, 65.5, 10, 3.5, "Multi", 3.5, false, false, true);
+      this.addRectangle(122, 67.2, 10, 0.1, "#ffffff");
+      this.addButton(285, 72.5, 15, 10, 30, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 0));
+      this.addLabel(285, 69, 15, 3.5, "A", 3.5, false, true, true);
+      this.addButton(300, 72.5, 15, 10, 31, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 8));
+      this.addLabel(300, 69, 15, 3.5, "B", 3.5, false, true, true);
+      this.addButton(327.5, 72.5, 15, 10, 20, Shade.LIGHT);
+      this.addLabel(327.5, 69, 15, 3.5, "Master", 3.5, false, true, false);
+      this.addButton(342.5, 72.5, 15, 10, 21, Shade.LIGHT);
+      this.addLabel(342.5, 69, 15, 3.5, "Storage", 3.5, false, true, false);
+      this.addButton(357.5, 72.5, 15, 10, 24, Shade.LIGHT);
+      this.addLabel(357.5, 65.5, 15, 3.5, "MIDI", 3.5, false, true, false);
+      this.addLabel(357.5, 69, 15, 3.5, "Control", 3.5, false, true, false);
+      this.addLabel(327.5, 87.5, 35, 3.5, "System", 3.5, true, false, false);
     }
-    this.container.setAttribute("viewBox", "-38 -4 218 43.5");
+    this.container.setAttribute("viewBox", "-95 -10 545.0 108.0");
 
   }
 
