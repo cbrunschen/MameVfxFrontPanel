@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+
+from textwrap import indent, dedent, wrap
+from dataclasses import dataclass, field
+from sys import argv, exit
+from argparse import ArgumentParser
+
+from panel import *
+from mame_layout import *
+from js_html import *
+
+def main() -> int:
+  parser = ArgumentParser()
+  group = parser.add_mutually_exclusive_group()
+  group.add_argument('-l', '--layout', choices=['vfx','vfxsd','sd1'])
+  group.add_argument('-js', '--javascript', action='store_true')
+
+  args = parser.parse_args()
+  visitor = None
+  if args.javascript:
+    visitor = HTMLJSVisitor()
+  elif args.layout:
+    visitor = MameLayoutVisitor(args.layout)
+  
+  if visitor:
+    p = Panel()
+    visitor.visitPanel(p)
+    print(visitor)
+  else:
+    eprint(f'No visitor specified')
+
+if __name__ == '__main__':
+  exit(main())
