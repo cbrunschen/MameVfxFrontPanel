@@ -489,7 +489,7 @@ class Panel:
         self.layout_rect(bounds=Rect(0, 0, 1, 1), color='#ffffff')
       ]),
 
-      self.layout_element(name='colored_rect', contents=[
+      self.layout_element(name='accent_rect', contents=[
         self.layout_rect(bounds=Rect(0, 0, 1, 1), color=self.color)
       ])
     ]
