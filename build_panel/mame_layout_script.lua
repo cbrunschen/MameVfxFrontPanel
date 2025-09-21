@@ -80,9 +80,12 @@ local function pointer_updated(type, id, dev, x, y, btn, dn, up, cnt)
   if dn & 1 ~= 0 then
     for i = 1, #sliders do
       if sliders[i].knob.bounds:includes(x, y) then
+        local clickarea = sliders[i].clickarea
+        local knob = sliders[i].knob
+        local dy = y - knob.bounds.y0
         pointers[id] = {
           selected_slider = i,
-          dy = y - sliders[i].knob.bounds.y0 -- position within the knob where it was clicked
+          dy = dy -- position within the knob where it was clicked
         }
         break
       end
@@ -103,11 +106,9 @@ local function pointer_updated(type, id, dev, x, y, btn, dn, up, cnt)
   local knob = slider.knob
   local clickarea = slider.clickarea
 
-  local new_value = 0
-  -- User clicked on the knob. The new value will depend on how much the
-  -- knob was dragged.
   local yy = y - pointer.dy
-  new_value = 100 * (1 - (yy - clickarea.bounds.y0) / (clickarea.bounds.height - knob.bounds.height))
+  local fraction = (yy - clickarea.bounds.y0) / (clickarea.bounds.height - knob.bounds.height)
+  local new_value = 100 * (1 - fraction)
   new_value = math.floor(new_value + 0.5)
   clamped_value = clamp(new_value)
   slider.field.user_value = clamped_value

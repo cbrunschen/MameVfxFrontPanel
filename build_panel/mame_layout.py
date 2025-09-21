@@ -38,7 +38,7 @@ class MameLayoutVisitor(PanelVisitor):
       ]),
       self.layout_group(name="slider", contents=[
         self.layout_element(ref="slider_frame", bounds=Rect(0, 0, 8, 24)),
-        self.layout_element(id="slider_~slider_id~", ref="invisible_rect", bounds=Rect(0.75, 0.75, 6.5, 18.5)),
+        self.layout_element(id="slider_~slider_id~", ref="invisible_rect", bounds=Rect(0.75, 0.75, 6.5, 22.5)),
         self.layout_element(ref="slider_knob", id="slider_knob_~slider_id~", contents=[
           self.layout_tag('animate', inputtag="~port_name~", inputmask="0x7f"),
           self.layout_bounds(knobTop, state="100"),
@@ -212,7 +212,7 @@ class MameLayoutVisitor(PanelVisitor):
     return Element('param', {'name':k, 'value':v}, [])
   
   def defaultFontSize(self):
-    return 1.7
+    return 4.3
   
   def visitAccentColor(self, accent_color: AccentColor):
     self.accent_color = accent_color.rgb
@@ -241,8 +241,8 @@ class MameLayoutVisitor(PanelVisitor):
     shape_name = f'button_{w}_{h}_{shade.name}'
 
     if shape_name not in self.button_shapes:
-      rect = Rect(0, 0, w, h).inset(0.1, 0.1)
-      svg = f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{str(rect.toPath(r=0.5, fill="white")).rstrip()}</svg>'
+      rect = Rect(0, 0, w, h).inset(0.25, 0.25)
+      svg = f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">{str(rect.toPath(r=1.25, fill="white")).rstrip()}</svg>'
       definition = self.layout_element(contents=[
         self.layout_svg_image(svg, state="0", color=shade.color),
         self.layout_svg_image(svg, state="1", color=shade.pressed_color)
