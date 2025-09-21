@@ -21,8 +21,6 @@ SHADE_LIGHT = Shade('light', "#bbbbbb", "#ffffff")
 SHADE_MEDIUM = Shade('medium', "#777777", "#ffffff")
 SHADE_DARK = Shade('dark', "#333333", '#ffffff')
 
-buttonLabelFontSize = 1.8
-
 roughDisplayRect = Rect(15, 6.5, 82, 12)
 charRect = Rect(0, 0, 342, 572)
 charsRect = Rect(0, 0, 40 * charRect.w, 2 * charRect.h)
@@ -35,6 +33,9 @@ class PanelElement:
     pass
 
 class PanelVisitor:
+  def defaultFontSize(self):
+    return 1.4
+  
   def load(self, fname):
     p = path.join(path.dirname(path.realpath(__file__)), fname)
     with open(p, "rt") as f:
@@ -162,9 +163,10 @@ class Conditional(PanelElement):
 
 @dataclass
 class Panel(PanelElement):
+  fontSize = 1.4
   # these are all internal variables really
   keyboard: str = None
-  rect: Rect = field(default_factory=lambda: Rect(0, 0, 0, 0))
+  bounds: Rect = field(default_factory=lambda: Rect(0, 0, 0, 0))
   background: Rectangle = None
   conditional: Conditional = None
   items: list[PanelElement] = field(default_factory=list)
@@ -180,7 +182,7 @@ class Panel(PanelElement):
       self.setAccentColor(self.color_vfx)
     self.endCondition()
 
-    self.background = Rectangle(self.rect, '#222222')
+    self.background = Rectangle(self.bounds, '#222222')
     self.add(self.background)
     self.add(Rectangle(displayGlassRect, '#000000'))
     self.add(Display(displayRect))
@@ -189,16 +191,16 @@ class Panel(PanelElement):
     
     self.onCondition('isSd1')
     if self.isTrue():
-      self.addLabel(10, 35, 6, buttonLabelFontSize, "BankSet", centered=True)
+      self.addLabel(10, 35, 6, self.fontSize, "BankSet", centered=True)
     if self.isFalse():
-      self.addLabel(10, 35, 6, buttonLabelFontSize, "Cart", centered=True)
+      self.addLabel(10, 35, 6, self.fontSize, "Cart", centered=True)
     self.endCondition()
 
     self.addButtonWithLightBelowDisplay(16, 29, "#Sounds",   53, SHADE_LIGHT, 0xd)
-    self.addLabel(16, 35, 6, buttonLabelFontSize, "Sounds", centered=True)
+    self.addLabel(16, 35, 6, self.fontSize, "Sounds", centered=True)
 
     self.addButtonWithLightBelowDisplay(22, 29, "#Presets",  54, SHADE_LIGHT, 0x7)
-    self.addLabel(22, 35, 6, buttonLabelFontSize, "Presets", centered=True)
+    self.addLabel(22, 35, 6, self.fontSize, "Presets", centered=True)
 
     self.addButtonWithLightBelowDisplay(42, 29, "#0", 55, SHADE_MEDIUM, 0xe)
     self.addButtonWithLightBelowDisplay(48, 29, "#1", 56, SHADE_MEDIUM, 0x6)
@@ -211,16 +213,16 @@ class Panel(PanelElement):
     self.addButtonWithLightBelowDisplay(90, 29, "#8", 34, SHADE_MEDIUM, 0x1)
     self.addButtonWithLightBelowDisplay(96, 29, "#9", 25, SHADE_MEDIUM, 0x9)
 
-    self.addLabel(42, 35, 6, buttonLabelFontSize, "0", centered=True)
-    self.addLabel(48, 35, 6, buttonLabelFontSize, "1", centered=True)
-    self.addLabel(54, 35, 6, buttonLabelFontSize, "2", centered=True)
-    self.addLabel(60, 35, 6, buttonLabelFontSize, "3", centered=True)
-    self.addLabel(66, 35, 6, buttonLabelFontSize, "4", centered=True)
-    self.addLabel(72, 35, 6, buttonLabelFontSize, "5", centered=True)
-    self.addLabel(78, 35, 6, buttonLabelFontSize, "6", centered=True)
-    self.addLabel(84, 35, 6, buttonLabelFontSize, "7", centered=True)
-    self.addLabel(90, 35, 6, buttonLabelFontSize, "8", centered=True)
-    self.addLabel(96, 35, 6, buttonLabelFontSize, "9", centered=True)
+    self.addLabel(42, 35, 6, self.fontSize, "0", centered=True)
+    self.addLabel(48, 35, 6, self.fontSize, "1", centered=True)
+    self.addLabel(54, 35, 6, self.fontSize, "2", centered=True)
+    self.addLabel(60, 35, 6, self.fontSize, "3", centered=True)
+    self.addLabel(66, 35, 6, self.fontSize, "4", centered=True)
+    self.addLabel(72, 35, 6, self.fontSize, "5", centered=True)
+    self.addLabel(78, 35, 6, self.fontSize, "6", centered=True)
+    self.addLabel(84, 35, 6, self.fontSize, "7", centered=True)
+    self.addLabel(90, 35, 6, self.fontSize, "8", centered=True)
+    self.addLabel(96, 35, 6, self.fontSize, "9", centered=True)
 
     # Large buttons on the main panel part
     self.addLargeButton         (108, 29, "Replace\nProgram", 29, SHADE_MEDIUM)
@@ -289,21 +291,21 @@ class Panel(PanelElement):
     self.addAccentColoredLine(154, 37, 24, 0.5)
 
     # And the labels just above it:
-    self.addLabel(-36, 35, 10, buttonLabelFontSize, "Volume")
-    self.addLabel(-17, 35, 10, buttonLabelFontSize, "Data Entry")
-    self.addLabel(108, 35, 10, buttonLabelFontSize, "Performance")
-    self.addLabel(154, 35, 10, buttonLabelFontSize, "Programming")
+    self.addLabel(-36, 35, 10, self.fontSize, "Volume")
+    self.addLabel(-17, 35, 10, self.fontSize, "Data Entry")
+    self.addLabel(108, 35, 10, self.fontSize, "Performance")
+    self.addLabel(154, 35, 10, self.fontSize, "Programming")
 
     # The things that are conditional.
     # When the keyboard has a sequencer:
     self.onCondition("hasSeq")
     if self.isTrue():
       self.addButtonBelowDisplay     (28, 29, "#Seq",      51, SHADE_LIGHT)
-      self.addLabel(28, 35, 6, buttonLabelFontSize, "Seq", centered=True)
+      self.addLabel(28, 35, 6, self.fontSize, "Seq", centered=True)
 
-      self.addWhiteLine(114, 29 - 1.5 * buttonLabelFontSize - 0.05, 3, 0.1)
-      self.addLabel(117, 29 - 2 * buttonLabelFontSize, 6, buttonLabelFontSize, "Tracks", centered=True)
-      self.addWhiteLine(123, 29 - 1.5 * buttonLabelFontSize - 0.05, 3, 0.1)
+      self.addWhiteLine(114, 29 - 1.5 * self.fontSize - 0.05, 3, 0.1)
+      self.addLabel(117, 29 - 2 * self.fontSize, 6, self.fontSize, "Tracks", centered=True)
+      self.addWhiteLine(123, 29 - 1.5 * self.fontSize - 0.05, 3, 0.1)
       self.addLargeButtonWithLight(114, 29, "1-6",              30, SHADE_MEDIUM, 0x0, centered=True)
       self.addLargeButtonWithLight(120, 29, "7-12",             31, SHADE_MEDIUM, 0x8, centered=True)
       
@@ -325,19 +327,19 @@ class Panel(PanelElement):
       self.addSmallButton(137,  6, "Storage",       21, SHADE_LIGHT, False)
       self.addSmallButton(143,  6, "MIDI\nControl", 24, SHADE_LIGHT, True)
 
-      self.addWhiteLine(131, 13 - 1.5 * buttonLabelFontSize - 0.05, 7, 0.1)
-      self.addLabel(138, 13 - 2 * buttonLabelFontSize, 4, buttonLabelFontSize, "Edit", centered=True)
-      self.addWhiteLine(142, 13 - 1.5 * buttonLabelFontSize - 0.05, 7, 0.1)
+      self.addWhiteLine(131, 13 - 1.5 * self.fontSize - 0.05, 7, 0.1)
+      self.addLabel(138, 13 - 2 * self.fontSize, 4, self.fontSize, "Edit", centered=True)
+      self.addWhiteLine(142, 13 - 1.5 * self.fontSize - 0.05, 7, 0.1)
 
-      self.addLabel(131, 2-(0.2 + buttonLabelFontSize), 10, buttonLabelFontSize, "System")
+      self.addLabel(131, 2-(0.2 + self.fontSize), 10, self.fontSize, "System")
       self.addAccentColoredLine(131, 2-0.2, 22, 0.2)
-      self.addLabel(131, 35, 10, buttonLabelFontSize, "Sequencer")
+      self.addLabel(131, 35, 10, self.fontSize, "Sequencer")
 
     # When there is no sequencer:
     if self.isFalse():
-      self.addWhiteLine(114, 29 - 1.5 * buttonLabelFontSize - 0.05, 4, 0.1)
-      self.addLabel(118, 29 - 2 * buttonLabelFontSize, 4, buttonLabelFontSize, "Multi", centered=True)
-      self.addWhiteLine(122, 29 - 1.5 * buttonLabelFontSize - 0.05, 4, 0.1)
+      self.addWhiteLine(114, 29 - 1.5 * self.fontSize - 0.05, 4, 0.1)
+      self.addLabel(118, 29 - 2 * self.fontSize, 4, self.fontSize, "Multi", centered=True)
+      self.addWhiteLine(122, 29 - 1.5 * self.fontSize - 0.05, 4, 0.1)
       self.addLargeButtonWithLight(114, 29, "A",              30, SHADE_MEDIUM, 0x0, centered=True)
       self.addLargeButtonWithLight(120, 29, "B",              31, SHADE_MEDIUM, 0x8, centered=True)
 
@@ -347,18 +349,18 @@ class Panel(PanelElement):
       self.addLargeButton(137, 29, "Storage",       21, SHADE_LIGHT, False)
       self.addLargeButton(143, 29, "MIDI\nControl", 24, SHADE_LIGHT, True)
 
-      self.addLabel(131, 35, 10, buttonLabelFontSize, "System")
+      self.addLabel(131, 35, 10, self.fontSize, "System")
     self.endCondition()
 
     # Add just a little space around.
-    self.rect = self.rect.outset(2, 2)
+    self.bounds = self.bounds.outset(2, 2)
     # Update the background bounds as well.
-    self.background.bounds = self.rect
+    self.background.bounds = self.bounds
 
   def add(self, e):
     destination = self.conditional.items if self.conditional else self.items
     destination.append(e)
-    self.rect = self.rect.enclosing(e)
+    self.bounds = self.bounds.enclosing(e)
   
   def setAccentColor(self, rgb):
     self.add(AccentColor(rgb))
@@ -373,12 +375,12 @@ class Panel(PanelElement):
     if not label.startswith("#"):
       labelLines = label.split("\n")
       nLines = len(labelLines)
-      y0 = h if labelPosition == BELOW else -nLines * buttonLabelFontSize
+      y0 = h if labelPosition == BELOW else -nLines * self.fontSize
       centered = ((labelPosition & CENTERED) != 0)
       
       for i in range(nLines):
         line = labelLines[i]
-        self.addLabel(x, y + y0 + i * buttonLabelFontSize, w, buttonLabelFontSize, line, italic=True, centered=centered)
+        self.addLabel(x, y + y0 + i * self.fontSize, w, self.fontSize, line, italic=True, centered=centered)
     
     if lightId >= 0:
       # Light bounds are relative to button bounds

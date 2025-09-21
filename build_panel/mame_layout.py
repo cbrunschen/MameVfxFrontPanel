@@ -211,6 +211,9 @@ class MameLayoutVisitor(PanelVisitor):
   def layout_param(self, k, v):
     return Element('param', {'name':k, 'value':v}, [])
   
+  def defaultFontSize(self):
+    return 1.7
+  
   def visitAccentColor(self, accent_color: AccentColor):
     self.accent_color = accent_color.rgb
 
@@ -373,8 +376,6 @@ class MameLayoutVisitor(PanelVisitor):
       Element('group', {'ref':'panel'})
     ])
     layout.append(view)
-
-
 
     script = Element('script', {}, [
       CDATA(self.load("mame_layout_script.lua"))

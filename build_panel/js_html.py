@@ -17,11 +17,18 @@ class HTMLJSVisitor(PanelVisitor):
   def iout(self):
     self.indent = self.indent.removeprefix('  ')
   
+  def defaultFontSize(self):
+    return 1.4
+
   def append(self, s):
     self.code.append(indent(s, self.indent))
   
   def extend(self, s):
     self.code.extend([indent(l, self.indent) for l in s])
+
+  def visitPanel(self, panel):
+    super().visitPanel(panel)
+    self.append(f'this.container.setAttribute("viewBox", "{panel.bounds.viewBox()}");')
   
   def visitAccentColor(self, color: AccentColor):
     self.append(f'this.accentColor = "{color.rgb}";')
@@ -52,7 +59,8 @@ class HTMLJSVisitor(PanelVisitor):
     '''))
 
   def visitButton(self, button: 'Button'):
-    addButton = f'this.addButton({button.bounds.coords()}, {button.number}, {button.shade.name})'
+    shade = button.shade.name.upper()
+    addButton = f'this.addButton({button.bounds.coords()}, {button.number}, Shade.{shade})'
     if button.light:
       light = button.light
       self.append(f'{addButton}.addLight(this.addLight({light.bounds.coords()}, {light.number}));')
@@ -65,7 +73,7 @@ class HTMLJSVisitor(PanelVisitor):
     self.append(f'this.addLabel({label.bounds.coords()}, "{label.text}", {label.fontSize}, {italic}, {centered});')
 
   def visitSlider(self, slider: 'Slider'):
-    self.append(f'this.addSlider({slider.bounds.coords()}), {slider.channel}, 0.5);')
+    self.append(f'this.addSlider({slider.bounds.coords()}, {slider.channel}, 0.5);')
 
   def visitRectangle(self, rectangle: 'Rectangle'):
     color = 'this.accentColor' if rectangle.color == 'accent' else f'"{rectangle.color}"'

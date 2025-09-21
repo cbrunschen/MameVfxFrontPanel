@@ -14,6 +14,7 @@ def main() -> int:
   group = parser.add_mutually_exclusive_group()
   group.add_argument('-l', '--layout', choices=['vfx','vfxsd','sd1'])
   group.add_argument('-js', '--javascript', action='store_true')
+  # parser.add_argument('-fs', '--fontsize', default=1.4)
 
   args = parser.parse_args()
   visitor = None
@@ -23,7 +24,7 @@ def main() -> int:
     visitor = MameLayoutVisitor(args.layout)
   
   if visitor:
-    p = Panel()
+    p = Panel(visitor.defaultFontSize())
     visitor.visitPanel(p)
     print(visitor)
   else:

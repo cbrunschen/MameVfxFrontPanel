@@ -10,7 +10,7 @@ LabelPosition = {
   BELOW: 3
 };
 
-Light = {
+LightState = {
   OFF: 0,
   ON: 1,
   BLINK: 2
@@ -425,7 +425,7 @@ class Button {
     this.halo.setAttribute("fill", "none");
     hideElement(this.halo);
 
-    rect = new Rect(0, 0, w, h);
+    rect = new Rect(0, 0, w, h).inset(0.1, 0.1);
     this.outline = rect.toPath(0.5);
     this.outline.setAttribute("fill", color);
     this.outline.setAttribute("stroke", "none");
@@ -496,17 +496,14 @@ class Light {
   constructor(x, y, w, h, number) {
     this.rect = new Rect(x, y, w, h);
 
-    var translation = "translate(" + x + "," + y + ")";
     this.number = number;
-    this.state = Light.OFF;
+    this.state = LightState.OFF;
     this.isOn = false;
     this.blinkPhase = 0;
 
-    this.group = this.createElement("group")
-    this.group.setAttribute("transform", translation);
+    this.group = createElement("g")
 
-    this.lightOn = createElement("path");
-    this.lightOn.setAttribute(`d", "M0 0 h${w}v${h}h${-w}z`);
+    this.lightOn = this.rect.toPath();
     this.lightOff = this.lightOn.cloneNode(true);
     this.lightOn.setAttribute("fill", "#22ff22");
     this.lightOff.setAttribute("fill", "#112211");
@@ -517,7 +514,7 @@ class Light {
   }
 
   update() {
-    var on = this.state == Light.ON || (this.blinkPhase && this.state == Light.BLINK);
+    var on = this.state == LightState.ON || (this.blinkPhase && this.state == LightState.BLINK);
     if (on != this.isOn) {
       hideElement(this.isOn ? this.lightOn : this.lightOff);
       this.isOn = on;
@@ -727,6 +724,9 @@ class Panel {
     this.container.setAttribute("height", "375");
     this.container.setAttribute("overflow", "scroll");
 
+    this.decorationsContainer = createElement("g");
+    this.container.appendChild(this.decorationsContainer);
+
     this.haloContainer = createElement("g");
     this.container.appendChild(this.haloContainer);
 
@@ -745,7 +745,7 @@ class Panel {
     this.buttons = new Array();
     this.lights = new Array();
     this.analogControls = new Array();
-    this.addControls(keyboard);
+    this.populate(keyboard);
 
     let messageRect = Rect.from(this.displayContainer);
 
@@ -868,9 +868,9 @@ class Panel {
     };
   }
 
-  addButton(x, y, w, number, color) {
+  addButton(x, y, w, h, number, color) {
     var that = this;
-    var button = new Button(x, y, w, number, color);
+    var button = new Button(x, y, w, h, number, color);
     this.haloContainer.appendChild(button.halo);
 
     this.mainContainer.appendChild(button.group);
@@ -892,13 +892,15 @@ class Panel {
     labelText.setAttribute('stroke', 'none');
     labelText.setAttribute('font-size', fontSize);
     labelText.setAttribute('font-family', 'Helvetica');
-    labelText.setAttribute('x', x);
-    labelText.setAttribute('y', y);
-    labelText.setAttribute('width', w);
-    labelText.setAttribute('height', h);
-    labelText.setAttribute('dominant-baseline', 'bottom');
+    if (italic) {
+      labelText.setAttribute('font-style', 'italic');
+    }
+    labelText.setAttribute('y', y + 0.7 * fontSize);
     if (centered) {
+      labelText.setAttribute('x', x + w/2);
       labelText.setAttribute('text-anchor', 'middle');
+    } else {
+      labelText.setAttribute('x', x);
     }
     labelText.appendChild(document.createTextNode(label));
     this.mainContainer.appendChild(labelText);
@@ -931,7 +933,7 @@ class Panel {
     rectangle.setAttribute("width", w);
     rectangle.setAttribute("height", h);
     rectangle.setAttribute("fill", color);
-    this.container.appendChild(rectangle);
+    this.decorationsContainer.appendChild(rectangle);
   }
 
   populate(keyboard) {
@@ -1032,11 +1034,11 @@ class Panel {
         var light = this.lights[whichLight];
         if (light != null && light instanceof Light) {
           if (state == 2) {
-            light.setState(Light.ON);
+            light.setState(LightState.ON);
           } else if (state == 3) {
-            light.setState(Light.BLINK);
+            light.setState(LightState.BLINK);
           } else {
-            light.setState(Light.OFF);
+            light.setState(LightState.OFF);
           }
         }
       }
