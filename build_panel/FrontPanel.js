@@ -600,8 +600,6 @@ class Slider {
   }
 
   setValue(value) {
-    console.log(`Moving slider to fraction ${value}`);
-
     this.value = Math.max(0.0, Math.min((1.0, value)));
     this.handleY = Math.max(this.handleMinY, 
       Math.min(this.handleMaxY, 
@@ -944,7 +942,6 @@ class Panel {
   }
 
   addSymbol(x, y, w, h, symbolName) {
-    console.log(`Adding symbol '${symbolName}' at ${x},${y}, ${w} by ${h}`)
     let path = createElement("path")
     path.setAttribute("stroke", "none");
     path.setAttribute("fill", "#ffffff");
