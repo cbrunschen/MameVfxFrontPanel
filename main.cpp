@@ -696,6 +696,17 @@ int main(int argc, char *argv[]) {
         continue;
       }
 
+      if (flag.starts_with("h") || flag == "?") {
+        std::cerr << std::format("{} flags:", argv[0]) << std::endl;
+        std::cerr << "  -listening_ports <ports>     [8080]" << std::endl;
+        std::cerr << "  -num_threads <n>             [3]" << std::endl;
+        std::cerr << "  -mame_host <host>            [localhost]" << std::endl;
+        std::cerr << "  -mame_port <port>            [15112]" << std::endl;
+        std::cerr << "  -webroot <path>              [none: serve compiled-in JS & HTML]" << std::endl;
+
+        exit(0);
+      }
+
       // if we get here, it's not either a web server or a mame flag!
       std::cerr << std::format("Unknown flag '{}'", arg) << std::endl;
       exit(-1);
