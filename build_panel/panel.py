@@ -342,8 +342,8 @@ class Panel(PanelElement):
     # When there is no sequencer:
     if self.isFalse():
       self.addWhiteLine(285, 72.5 - 1.5 * self.fontSize - 0.05, 10, 0.1)
-      self.addLabel(118, 72.5 - 2 * self.fontSize, 10, self.fontSize, "Multi", centered=True)
-      self.addWhiteLine(122, 72.5 - 1.5 * self.fontSize - 0.05, 10, 0.1)
+      self.addLabel(295, 72.5 - 2 * self.fontSize, 10, self.fontSize, "Multi", centered=True)
+      self.addWhiteLine(305, 72.5 - 1.5 * self.fontSize - 0.05, 10, 0.1)
       self.addLargeButtonWithLight(285, 72.5, "A",              30, SHADE_MEDIUM, 0x0, centered=True)
       self.addLargeButtonWithLight(300, 72.5, "B",              31, SHADE_MEDIUM, 0x8, centered=True)
 

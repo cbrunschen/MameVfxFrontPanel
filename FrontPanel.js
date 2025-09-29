@@ -1148,8 +1148,8 @@ class Panel {
       this.addLabel(327.5, 87.5, 25, 3.5, "Sequencer", 3.5, true, false, false);
     } else { // not hasSeq
       this.addRectangle(285, 67.2, 10, 0.1, "#ffffff");
-      this.addLabel(118, 65.5, 10, 3.5, "Multi", 3.5, false, false, true);
-      this.addRectangle(122, 67.2, 10, 0.1, "#ffffff");
+      this.addLabel(295, 65.5, 10, 3.5, "Multi", 3.5, false, false, true);
+      this.addRectangle(305, 67.2, 10, 0.1, "#ffffff");
       this.addButton(285, 72.5, 15, 10, 30, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 0));
       this.addLabel(285, 69, 15, 3.5, "A", 3.5, false, true, true);
       this.addButton(300, 72.5, 15, 10, 31, Shade.MEDIUM).addLight(this.addLight(5, 0.4, 5, 3.3333, 8));
