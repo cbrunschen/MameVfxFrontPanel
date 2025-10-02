@@ -6,7 +6,7 @@ By default, `MameVfxFrontPanel` serves its contents on all local interfaces on p
 [http://localhost:8080/] (and also at [http://localhost:8080/index.html] and, for historical reasons, at
 [http://localhost:8080/FrontPanel.html]).
 
-It connects to a locally running instance of MAME on port `15112`, the [https://github.com/mamedev/mame/blob/b6df5c4970f9704449ca1c94310c30e4e6d3bc6a/src/emu/emuopts.cpp#L192](default value for MAME's `comm_localport` option) at the time of writing.
+It connects to a locally running instance of MAME on port `15112`, the [default value for MAME's `comm_localport` option](https://github.com/mamedev/mame/blob/b6df5c4970f9704449ca1c94310c30e4e6d3bc6a/src/emu/emuopts.cpp#L192) at the time of writing.
 
 You can explicitly specify the host and port on which to listen using CivetWeb's standard `-listening_ports` command line flag:
 
