@@ -1,8 +1,10 @@
 # build_panel
 
-Here you can find a small Python program, [`build_panel.py`](build_panel.py), that generates VFX-family front panels for use with MAME's emulation of those keyboards.
+A small Python program, [`build_panel.py`](build_panel.py), that generates VFX-family front panels for use with MAME's emulation of those keyboards.
 
 It can generate either JavaScript code for inclusion with the enclosing `MameVfxFrontPanel` web front-end, or [MAME Layout files](https://docs.mamedev.org/techspecs/layout_files.html) for inclusion within MAME itself.
+
+In fact it was used to generate [`vfx.lay`](https://github.com/cbrunschen/mame/blob/vfx_panel/src/mame/layout/vfx.lay), [`vfxsd.lay`](https://github.com/cbrunschen/mame/blob/vfx_panel/src/mame/layout/vfxsd.lay) and [`sd1.lay`](https://github.com/cbrunschen/mame/blob/vfx_panel/src/mame/layout/sd1.lay) that are part of [#14131](https://github.com/mamedev/mame/pull/14131).
 
 It uses the Visitor pattern to generate different outputs from a single panel description.
 

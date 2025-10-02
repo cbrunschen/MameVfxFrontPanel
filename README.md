@@ -1,6 +1,10 @@
+# Overview
+
 `MameVfxFrontPanel` offers a web interface to the Ensoniq VFX family of keybards as emulated by MAME, running
-as plain HTTP. It is implemented using the [https://github.com/civetweb/civetweb](CivetWeb) embeddable
+as plain HTTP. It is implemented using the [CivetWeb](https://github.com/civetweb/civetweb) embeddable
 web server.
+
+It uses the remote panel support implemented in [#14131](https://github.com/mamedev/mame/pull/14131).
 
 By default, `MameVfxFrontPanel` serves its contents on all local interfaces on port `8080`: You can access the front panel as
 [http://localhost:8080/] (and also at [http://localhost:8080/index.html] and, for historical reasons, at
