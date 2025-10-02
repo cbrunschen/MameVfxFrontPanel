@@ -33,3 +33,8 @@ will start MAME, listening only on the loopback interface `127.0.0.1` (and thus 
 
 
 `MameVfxFrontPanel` currently builds on Linux with `cmake` using `clang++` 20. It requires support for `#embed` to embed the HTML and JavaScript source files into the binary.
+
+# [`build_panel`](build_panel)
+
+The project also includes the [`build_panel`](build_panel) directory, which contains a Python program that generates the panel itself, either as JavaScript code for use in `MameVfxFrontPanel` or as individual [MAME layout files](https://docs.mamedev.org/techspecs/layout_files.html) for the `vfx`, `vfxsd` and `sd1` / `sd132` keyboards, for inclusion in MAME itself. See [`build_panel/README.md`](build_panel/README.md) for more details.
+
