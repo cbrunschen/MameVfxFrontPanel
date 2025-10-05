@@ -59,13 +59,13 @@ will attempt to reconnect, once every second, until it succeeds or is stopped.
 When running MAME, you can of course tell MAME which interface address and port number to listen on, using MAME's `-comm_localhost` and `-comm_localport` command line flags:
 
 ```console
-mame sd132 -comm_localhost 127.0.0.1 -comm_localport 9000
+$ mame sd132 -comm_localhost 127.0.0.1 -comm_localport 9000
 ```
 
 will start MAME, listening only on the loopback interface `127.0.0.1` (and thus not be accessible from any other machine) on port `9000` instead of MAME's default port `15112`. You would then need to run `MameVfxFrontPanel` to match the above:
 
 ```console
-MameVfxFrontPanel -mame_host localhost -mame_port 9000
+$ MameVfxFrontPanel -mame_host localhost -mame_port 9000
 ```
 
 `MameVfxFrontPanel` currently builds on Linux with `cmake` using `clang++` 20. It requires support for `#embed` to embed the HTML and JavaScript source files into the binary.
