@@ -17,14 +17,14 @@ new key and a self-signed certificate, and the front panel can also be accessed 
 
 You can explicitly specify the host and port on which to listen using CivetWeb's standard `-listening_ports` command line flag:
 
-```console
+```bash
 $ MameVfxFrontPanel -listening_ports localhost:9090
 ```
 
 will listen only on the loopback interface `127.0.0.1` port `9090`. You can specify multiple ports,
 and SSL ports are identified by adding a suffix `s`. So
 
-```console
+```bash
 $ MameVfxFrontPanel -listening_ports 9090,9443s
 ```
 
@@ -32,7 +32,7 @@ will listen on port 9090 for HTTP and 9443 for HTTPS traffic.
 
 You can also specify the host and port where MAME should be listening for a connection, using the `-mame_host` and `-mame_port` options:
 
-```console
+```bash
 $ MameVfxFrontPanel -mame_host some.machine -mame_port 9000
 ```
 
@@ -41,13 +41,13 @@ will attempt to connect to MAME running on `some.machine` port 9000.
 If you're running MAME and `MameVfxFrontPanel` both on the same machine, their defaults should match,
 and `MameVfxFrontPanel` should automatically connect to MAME. This gives us a simplest case: Running
 
-```console
+```bash
 $ mame sd132
 ```
 
 in one terminal starts MAME emulating the Ensoniq SD-1/32, listening for a connection on the default port 15112; and running
 
-```console
+```bash
 $ MameVfxFrontPanel
 ```
 
@@ -58,13 +58,13 @@ will attempt to reconnect, once every second, until it succeeds or is stopped.
 
 When running MAME, you can of course tell MAME which interface address and port number to listen on, using MAME's `-comm_localhost` and `-comm_localport` command line flags:
 
-```console
+```bash
 $ mame sd132 -comm_localhost 127.0.0.1 -comm_localport 9000
 ```
 
 will start MAME, listening only on the loopback interface `127.0.0.1` (and thus not be accessible from any other machine) on port `9000` instead of MAME's default port `15112`. You would then need to run `MameVfxFrontPanel` to match the above:
 
-```console
+```bash
 $ MameVfxFrontPanel -mame_host localhost -mame_port 9000
 ```
 
