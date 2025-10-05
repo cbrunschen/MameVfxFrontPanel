@@ -34,7 +34,7 @@
 #define LOG_FUNCTION do{}while(0)
 #endif // DEBUG
 
-#ifndef NO_SSL
+#if USE_SSL
 #include <openssl/ssl3.h>
 
 static const unsigned char ssl_key[] {
@@ -45,7 +45,7 @@ static const unsigned char ssl_cert[] {
 #embed SSL_CERT
 };
 
-#endif // NO_SSL
+#endif // USE_SSL
 
 static const char html[] {
 #embed HTML
@@ -514,7 +514,7 @@ struct Server {
             collector.clear_message();
           }
         } else if (nread == 2) {
-          std::cerr << "Exiting MAME thread!" << std::endl;
+          LOG("talk_to_mame(): Exiting MAME thread!");
           close(sfd);
           return finish_talking_to_mame();
         } else {
@@ -561,7 +561,7 @@ struct Server {
             return 0;
           }
         } else if (pfds[0].revents & POLLIN) {
-          std::cerr << "Exiting MAME thread!" << std::endl;
+          LOG("read_from_mame(): Exiting MAME thread!");
           return 2;
         } else if (pfds[1].revents & POLLERR) {
           std::cerr << "Error polling MAME" << std::endl;
@@ -657,7 +657,7 @@ void write_template(std::ostream &dst, const char *src, substitution substitute,
   write_template(dst, src_stream, substitute, init, term);
 }
 
-#ifndef NO_SSL
+#if USE_SSL
 
 static int init_ssl(void *ssl_ctx, void *user_data) {
 	SSL_CTX *ctx = (SSL_CTX *)ssl_ctx;
@@ -676,7 +676,7 @@ static int init_ssl(void *ssl_ctx, void *user_data) {
 	return 0; /* let CivetWeb set up the rest of OpenSSL */
 }
 
-#endif // NO_SSL
+#endif // USE_SSL
 
 /* Handler for new websocket connections. */
 static int ws_connect_handler(const struct mg_connection *conn, void *user_data) {
@@ -834,11 +834,13 @@ int main(int argc, char *argv[]) {
   };
 
   static const char *web_server_options[] = {
-  #ifdef NO_SSL
-    "listening_ports", "8080",
-  #else // NO_SSL
+  #if USE_SSL
+  // #warning "Using SSL"
     "listening_ports", "8080,8443s",
-  #endif // NO_SSL
+  #else // ! USE_SSL
+  // # warning "NO SSL"
+    "listening_ports", "8080",
+  #endif // USE_SSL
     "num_threads", "10",
     nullptr, nullptr,
   };
@@ -919,9 +921,9 @@ int main(int argc, char *argv[]) {
   /* Start the server using the advanced API. */
   struct mg_callbacks callbacks = {0};
 
-#ifndef NO_SSL
+#if USE_SSL
   callbacks.init_ssl = init_ssl;
-#endif // NO_SSL
+#endif // USE_SSL
 
   void *user_data = &server;
 

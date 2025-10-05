@@ -46,9 +46,13 @@ if(USE_SSL)
     "OPENSSL_API_3_0"
     "SSL_CERT=\"${CMAKE_CURRENT_BINARY_DIR}/cert.der\""
     "SSL_KEY=\"${CMAKE_CURRENT_BINARY_DIR}/key.der\""
+    "USE_SSL=1"
   )
 else()
-  target_compile_definitions(${TARGET} PRIVATE "NO_SSL")
+  target_compile_definitions(${TARGET} PRIVATE 
+    "NO_SSL"
+    "USE_SSL=0"
+  )
 endif()
 
 target_sources(${TARGET} PRIVATE 
