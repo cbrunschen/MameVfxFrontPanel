@@ -34,6 +34,19 @@
 #define LOG_FUNCTION do{}while(0)
 #endif // DEBUG
 
+#ifndef NO_SSL
+#include <openssl/ssl3.h>
+
+static const unsigned char ssl_key[] {
+#embed SSL_KEY
+};
+
+static const unsigned char ssl_cert[] {
+#embed SSL_CERT
+};
+
+#endif // NO_SSL
+
 static const char html[] {
 #embed HTML
 };
@@ -644,6 +657,27 @@ void write_template(std::ostream &dst, const char *src, substitution substitute,
   write_template(dst, src_stream, substitute, init, term);
 }
 
+#ifndef NO_SSL
+
+static int init_ssl(void *ssl_ctx, void *user_data) {
+	SSL_CTX *ctx = (SSL_CTX *)ssl_ctx;
+
+	SSL_CTX_use_certificate_ASN1(ctx, sizeof(ssl_cert), ssl_cert);
+	SSL_CTX_use_PrivateKey_ASN1(EVP_PKEY_RSA,
+	                            ctx,
+	                            ssl_key,
+	                            sizeof(ssl_key));
+
+	if (SSL_CTX_check_private_key(ctx) == 0) {
+		printf("SSL data inconsistency detected\n");
+		return -1;
+	}
+
+	return 0; /* let CivetWeb set up the rest of OpenSSL */
+}
+
+#endif // NO_SSL
+
 /* Handler for new websocket connections. */
 static int ws_connect_handler(const struct mg_connection *conn, void *user_data) {
   Server *server = static_cast<Server *>(user_data);
@@ -800,7 +834,11 @@ int main(int argc, char *argv[]) {
   };
 
   static const char *web_server_options[] = {
+  #ifdef NO_SSL
     "listening_ports", "8080",
+  #else // NO_SSL
+    "listening_ports", "8080,8443s",
+  #endif // NO_SSL
     "num_threads", "10",
     nullptr, nullptr,
   };
@@ -880,12 +918,18 @@ int main(int argc, char *argv[]) {
 
   /* Start the server using the advanced API. */
   struct mg_callbacks callbacks = {0};
+
+#ifndef NO_SSL
+  callbacks.init_ssl = init_ssl;
+#endif // NO_SSL
+
   void *user_data = &server;
 
   struct mg_init_data mg_start_init_data = {0};
   mg_start_init_data.callbacks = &callbacks;
   mg_start_init_data.user_data = user_data;
   mg_start_init_data.configuration_options = web_server_options;
+
 
   struct mg_error_data mg_start_error_data = {0};
   char errtxtbuf[256] = {0};
