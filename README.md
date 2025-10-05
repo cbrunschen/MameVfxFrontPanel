@@ -45,7 +45,7 @@ and `MameVfxFrontPanel` should automatically connect to MAME. This gives us a si
 $ mame sd132
 ```
 
-in one terminal starts MAME emulating the Ensoniq SD-1/32, listening for a connection on the ddeault port 15112; and running
+in one terminal starts MAME emulating the Ensoniq SD-1/32, listening for a connection on the default port 15112; and running
 
 ```console
 $ MameVfxFrontPanel
