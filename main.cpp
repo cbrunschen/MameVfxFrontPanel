@@ -25,6 +25,15 @@
 #define HTML "FrontPanel.html"
 #define JS "FrontPanel.js"
 
+#define DEBUG 0
+#if DEBUG
+#define LOG(...) LOG(__VA_ARGS__)
+#define LOG_FUNCTION do { LOG("%s(), state = %d\r\n", __func__, m_mame_connection_state); } while(0)
+#else // DEBUG
+#define LOG(...) do{}while(0)
+#define LOG_FUNCTION do{}while(0)
+#endif // DEBUG
+
 static const char html[] {
 #embed HTML
 };
@@ -41,6 +50,37 @@ static int connection_counter = 0;
 
 static int pipefds[2] = {0};
 
+struct Pipe {
+  int r;
+  int w;
+  Pipe() {
+    int pfds[2];
+    if (pipe(pfds) == 0) {
+      r = pfds[0];
+      w = pfds[1];
+      fcntl(r, F_SETFL, O_NONBLOCK);
+    } else {
+      r = w = -1;
+    }
+  }
+  void checkRead(pollfd &pfd) {
+    pfd.fd = r;
+    pfd.events = POLLIN | POLLERR;
+  }
+  int write(const void *s, size_t n) {
+    return ::write(w, s, n);
+  }
+  int write(char c) {
+    return write(&c, 1);
+  }
+  int read(void *s, size_t n) {
+    return ::read(r, s, n);
+  }
+  int read(char &c) {
+    return read(&c, 1);
+  }
+};
+
 template<size_t size>
 struct MessageCollector {
   std::array<char, size> m_buffer;
@@ -49,37 +89,37 @@ struct MessageCollector {
   bool m_overflow = false;
 
   void handle(char c) {
-    // printf("Received %02x, overflow=%d\r\n", c, m_overflow);
+    // LOG("Received %02x, overflow=%d\r\n", c, m_overflow);
     if (m_overflow) {
       if (c == '\n') {
-        // printf("Found end of overflowing message, restarting.\r\n");
+        // LOG("Found end of overflowing message, restarting.\r\n");
         m_received = 0;
         m_overflow = false;
       } else {
-        // printf("In buffer overflow, ignoring.\r\n");
+        // LOG("In buffer overflow, ignoring.\r\n");
       }
     } else {
       switch(c) {
         case '\r': // ignore
-          // printf("ignoring CR\r\n");
+          // LOG("ignoring CR\r\n");
           break;
 
         case '\n':
-          // printf("LF, have a message of %ld bytes\r\n", m_received);
+          // LOG("LF, have a message of %ld bytes\r\n", m_received);
           m_message_length = m_received;
           m_received = 0;
           break;
         
         default:
           if (m_received >= m_buffer.size()) {
-            // printf("Already have %ld of %ld characters - buffer overflow!\r\n", m_received, m_buffer.size());
+            // LOG("Already have %ld of %ld characters - buffer overflow!\r\n", m_received, m_buffer.size());
             m_overflow = true;
             m_message_length = 0;
             m_received = 0;
           } else {
             m_message_length = 0;
             m_buffer[m_received++] = c;
-            // printf("accumulated character %02x, now have %ld (of max %ld)\r\n", c, m_received, m_buffer.size());
+            // LOG("accumulated character %02x, now have %ld (of max %ld)\r\n", c, m_received, m_buffer.size());
           }
       }
     }
@@ -102,10 +142,33 @@ struct MessageCollector {
   }
 };
 
+enum connection_state {
+  cs_idle = 0,
+  cs_starting,
+  cs_connecting,
+  cs_reconnecting,
+  cs_connected,
+  cs_stopping,
+};
+
 struct WSClient {
   struct mg_connection *m_connection;
   int m_connection_number;
   bool m_ready = false;
+
+  void sendConnectionState(int cs) {
+    LOG("Sending connection state %d:", cs);
+    if (cs == cs_connecting) {
+      LOG("connecting\r\n");
+      send("MConnecting to MAME ...");
+    } else if (cs == cs_reconnecting) {
+      LOG("reconnecting\r\n");
+      send("MReconnecting to MAME ...");
+    } else {
+      LOG("other, no message\r\n");
+      send("M");
+    }
+  }
 
   void send(const char *data, size_t len) {
     if (m_connection && m_ready) {
@@ -119,14 +182,7 @@ struct WSClient {
   }
 };
 
-// pre-composed into command format.
-const static std::string connection_state_commands[] {
-  "MConnecting to MAME ...",
-  "MReconnecting to MAME ...",
-  "M",
-};
-
-std::ostream &operator<<(std::ostream &o, struct addrinfo *pai) {
+std::ostream &operator<<(std::ostream &o, const struct addrinfo *pai) {
   if (pai->ai_family == AF_INET) {
     struct sockaddr_in *psai = (struct sockaddr_in*)pai->ai_addr;
     char ip[INET_ADDRSTRLEN];
@@ -148,6 +204,10 @@ std::ostream &operator<<(std::ostream &o, struct addrinfo *pai) {
   }
 }
 
+std::ostream &operator<<(std::ostream &o, const struct addrinfo &ai) {
+  return o << &ai;
+}
+
 struct Server {
   std::string mame_host;
   std::string mame_port;
@@ -157,14 +217,22 @@ struct Server {
   struct mg_context *m_mg_ctx = nullptr;
 
   std::unordered_set<WSClient *> m_ws_clients;
-  int m_mame_socket = -1;
   std::map<std::string, std::string> m_template_values;
 
-  static constexpr int cs_connecting = 0;
-  static constexpr int cs_reconnecting = 1;
-  static constexpr int cs_connected = 2;
+  int m_mame_socket = -1;
 
-  int m_connection_state = cs_connecting;
+  int m_mame_connection_state = cs_idle;
+
+  std::thread m_mame_thread;
+  Pipe m_mame_thread_commands;
+
+  Server(const std::string &mame_host, const std::string &mame_port, const std::string &webroot) 
+  : mame_host(mame_host), mame_port(mame_port), webroot(webroot), m_mame_thread_commands() {
+    if ((m_mame_thread_commands.r < 0) || (m_mame_thread_commands.w < 0)) {
+      std::cerr << "!!! Failed to create pipe !!!" << std::endl;
+      exit(1);
+    }
+  }
   
   void lock() {
     mg_lock_context(m_mg_ctx);
@@ -176,6 +244,7 @@ struct Server {
 
   void send_to_all_clients(const char *data, size_t len, struct mg_connection *except = nullptr) {
     lock();
+    LOG_FUNCTION;
     for (const auto &c: m_ws_clients) {
       if (c->m_connection != except) c->send(data, len);
     }
@@ -184,39 +253,64 @@ struct Server {
 
   void send_to_mame(const char *data, size_t len) {
     lock();
+    LOG_FUNCTION;
     if (m_mame_socket >= 0) {
-      // printf("Sending %d to MAME\r\n", len);
+      // LOG("Sending %d to MAME\r\n", len);
       write(m_mame_socket, data, len);
       write(m_mame_socket, "\r\n", 2);
     } else {
-      // printf("No MAME socket, Sending %d to MAME\r\n", len);
+      // LOG("No MAME socket, Sending %d to MAME\r\n", len);
     }
     unlock();
   }
 
   void set_mame_socket(int s) {
     lock();
+    LOG_FUNCTION;
     m_mame_socket = s;
     unlock();
   }
 
-  void reset_mame_socket() { set_mame_socket(-1); }
+  void reset_mame_socket() { 
+    lock();
+    LOG_FUNCTION;
+    if (m_mame_socket >= 0) {
+      close(m_mame_socket);
+    }
+    set_mame_socket(-1);
+    unlock();
+  }
 
   void add_client(WSClient *client) {
     lock();
+    LOG_FUNCTION;
+    
+    if (m_ws_clients.empty()) {
+      start_talking_to_mame();
+    }
+
     m_ws_clients.insert(client);
+
     unlock();
   }
 
   void client_ready(WSClient *client) {
     lock();
-    client->send(connection_state_commands[m_connection_state]);
+    LOG_FUNCTION;
+    client->sendConnectionState(m_mame_connection_state);
     unlock();
   }
 
   void remove_client(WSClient *client) {
     lock();
+    LOG_FUNCTION;
+
     m_ws_clients.erase(client);
+
+    if (m_ws_clients.empty()) {
+      stop_talking_to_mame();
+    }
+
     unlock();
   }
 
@@ -263,20 +357,62 @@ struct Server {
     }
   }
 
-  void set_connection_state(int cs) {
-    if (cs != m_connection_state) {
-      m_connection_state = cs;
-      lock();
+  void set_mame_connection_state(int cs) {
+    lock();
+    LOG_FUNCTION;
+    if (cs != m_mame_connection_state) {
+      // LOG("  new state = %d\r\n", cs);
+      m_mame_connection_state = cs;
       for (const auto &c: m_ws_clients) {
-        c->send(connection_state_commands[cs]);
+        c->sendConnectionState(cs);
       }
-      unlock();
     }
+    unlock();
+  }
+
+  void start_talking_to_mame() {
+    lock();
+    LOG_FUNCTION;
+    if (m_mame_connection_state == cs_idle) {
+      // std::cout << "Starting MAME connection thread" << std::endl;
+      set_mame_connection_state(cs_starting);
+      m_mame_thread = std::thread(&Server::talk_to_mame, this);
+    }
+    unlock();
+  }
+
+  void stop_talking_to_mame() {
+    lock();
+    LOG_FUNCTION;
+    if (m_mame_connection_state != cs_idle) {
+      m_mame_thread_commands.write('!');
+      m_mame_thread.join();
+    }
+
+    set_mame_connection_state(cs_idle);
+
+    unlock();
+  }
+
+  void finish_talking_to_mame() {
+    lock();
+    LOG_FUNCTION;
+    set_mame_connection_state(cs_stopping);
+    reset_mame_socket();
+    unlock();
+    
+    char c;
+    // LOG("- Reading from mame command pipe\r\n");
+    while (m_mame_thread_commands.read(c) > 0) { /* no-op */ }
+    // LOG("- Finished reading from mame command pipe\r\n");
+    return;
   }
 
   void talk_to_mame() {
+    LOG_FUNCTION;
+    set_mame_connection_state(cs_connecting);
+
     std::cout << "Connecting to MAME ..." << std::endl;
-    set_connection_state(cs_connecting);
     while (true) {
       /* First we set up the connection to MAME */
       int sfd;
@@ -289,7 +425,8 @@ struct Server {
 
       int ar = getaddrinfo(mame_host.c_str(), mame_port.c_str(), &hints, &result);
 
-      struct pollfd pfd {0};
+      struct pollfd pfds[2] {0};
+      m_mame_thread_commands.checkRead(pfds[0]);
 
       for (rp = result; rp != NULL; rp = rp->ai_next) {
         sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
@@ -304,12 +441,16 @@ struct Server {
 
         connect(sfd, rp->ai_addr, rp->ai_addrlen);
 
-        pfd.fd = sfd;
-        pfd.events = POLLOUT;
+        pfds[1].fd = sfd;
+        pfds[1].events = POLLOUT;
 
-        if (poll(&pfd, 1, 1000) == 1 && pfd.revents == POLLOUT) {
-          std::cout << " Connected!" << std::endl;
-          break;                  /* Success */
+        if (poll(pfds, 2, 1000) > 0) {
+          if (pfds[0].revents & POLLIN) {
+            return finish_talking_to_mame();
+          } else if (pfds[1].revents == POLLOUT) {
+            std::cout << " Connected!" << std::endl;
+            break;                  /* Success */
+          }
         }
 
         std::cout << " Connection failed." << std::endl;
@@ -319,17 +460,20 @@ struct Server {
       freeaddrinfo(result);           /* No longer needed */
 
       if (rp == NULL) {               /* No address succeeded */
-        sleep(1);
+        // Wait for up to 1 second - but instead of sleep(), we poll the shutdown pipe.
+        if (poll(&pfds[0], 1, 1000) > 0) {
+          return finish_talking_to_mame();
+        }
         continue;
       }
 
       // Connected!
 
-      set_connection_state(cs_connected);
+      set_mame_connection_state(cs_connected);
       send_to_all_clients("DX", 2); // clear the clients' screen(s)
 
-      pfd.fd = sfd;
-      pfd.events = POLLIN | POLLHUP;
+      pfds[0].fd = sfd;
+      pfds[0].events = POLLIN | POLLHUP;
 
       MessageCollector<4096> collector;
       char c;
@@ -343,7 +487,8 @@ struct Server {
       set_mame_socket(sfd);
 
       while (true) {
-        if (read_from_mame(sfd, c)) {
+        int nread = read_from_mame(c);
+        if (nread == 1) {
           collector.handle(c);
           if (collector.has_message() && collector.message_length() > 0) {
             std::string_view message(collector.message_data(), collector.message_length());
@@ -355,6 +500,10 @@ struct Server {
             send_to_all_clients(collector.message_data(), collector.message_length());
             collector.clear_message();
           }
+        } else if (nread == 2) {
+          std::cerr << "Exiting MAME thread!" << std::endl;
+          close(sfd);
+          return finish_talking_to_mame();
         } else {
           std::cerr << std::format("Failed to read from MAME!") << std::endl;
           break;
@@ -364,7 +513,7 @@ struct Server {
       reset_mame_socket();
       close(sfd);
 
-      set_connection_state(cs_reconnecting);
+      set_mame_connection_state(cs_reconnecting);
     }
   }
 
@@ -375,50 +524,50 @@ struct Server {
       fflush(stdout);
       return false;
     } else {
-      // printf("(K)");
+      // LOG("(K)");
       fflush(stdout);
       return true;
     }
   }
 
-  bool read_from_mame(int sfd, char &c) {
+  int read_from_mame(char &c) {
     int nfds;
 
-    struct pollfd pfd {0};
-    pfd.fd = sfd;
-    pfd.events = POLLIN | POLLHUP;
+    struct pollfd pfds[2] {0};
+    m_mame_thread_commands.checkRead(pfds[0]);
+    pfds[1].fd = m_mame_socket;
+    pfds[1].events = POLLIN | POLLHUP;
 
     while (true) {
-      // printf("p"); fflush(stdout);
-      if ((nfds = poll(&pfd, 1, 10000)) >= 0) {
-        // printf("%d", nfds); fflush(stdout);
+      // LOG("p"); fflush(stdout);
+      if ((nfds = poll(pfds, 2, 10000)) >= 0) {
+        // LOG("%d", nfds); fflush(stdout);
         if (nfds == 0) {
           // timeout
-          if (!keepalive(sfd)) {
-            return false;
+          if (!keepalive(m_mame_socket)) {
+            return 0;
           }
-        } else if (pfd.revents & POLLERR) {
+        } else if (pfds[0].revents & POLLIN) {
+          std::cerr << "Exiting MAME thread!" << std::endl;
+          return 2;
+        } else if (pfds[1].revents & POLLERR) {
           std::cerr << "Error polling MAME" << std::endl;
-          return false;
-        } else if (pfd.revents & POLLHUP) {
+          return 0;
+        } else if (pfds[1].revents & POLLHUP) {
           std::cerr << "Hangup polling MAME" << std::endl;
-          return false;
-        } else if (pfd.revents & POLLIN) {
-          int nread = read(sfd, &c, 1);
-          return nread == 1;
+          return 0;
+        } else if (pfds[1].revents & POLLIN) {
+          int nread = read(m_mame_socket, &c, 1);
+          return nread;
         } else {
           std::cerr << "Unexpected result polling MAME" << std::endl;
-          return false;
+          return 0;
         }
       } else {
         std::cerr << "Failed to poll MAME" << std::endl;
-        return false;
+        return 0;
       }
     }
-  }
-
-  std::thread start_mame_thread() {
-    return std::thread(&Server::talk_to_mame, this);
   }
 
   std::filesystem::path html_path() {
@@ -470,17 +619,17 @@ void write_template(std::ostream &dst, std::istream &src, substitution substitut
     getline(src, s, init);
     dst << s;
     if (src.good()) {
-      // printf("template: found initiator '%c'\n", init);
+      // LOG("template: found initiator '%c'\n", init);
       getline(src, s, term);
       if (src.good()) {
         dst << substitute(s);
       } else {
-        // printf("template: reached end before terminator\n");
+        // LOG("template: reached end before terminator\n");
         dst << init;
         dst << s;
       }
     } else {
-      // printf("template: reached end before initiator\n");
+      // LOG("template: reached end before initiator\n");
     }
   }
 }
@@ -513,7 +662,7 @@ static int ws_connect_handler(const struct mg_connection *conn, void *user_data)
 
   /* DEBUG: New client connected (but not ready to receive data yet). */
   const struct mg_request_info *ri = mg_get_request_info(conn);
-  // printf("Client %u connected\n", client->m_connection_number);
+  // LOG("Client %u connected\n", client->m_connection_number);
 
   return 0;
 }
@@ -533,7 +682,7 @@ static void ws_ready_handler(struct mg_connection *conn, void *user_data) {
   (void)ri; /* in this example, we do not need the request_info */
 
   /* DEBUG: New client ready to receive data. */
-  // printf("Client %u ready to receive data\n", client->m_connection_number);
+  // LOG("Client %u ready to receive data\n", client->m_connection_number);
 }
 
 /* Handler indicating the client sent data to the server. */
@@ -566,11 +715,11 @@ static int ws_data_handler(struct mg_connection *conn,
     break;
   }
 
-  // printf("Websocket received %lu bytes of %s (%02x) data from client %u\n",
-  //        (unsigned long)datasize,
-  //        messageType,
-  //        opcode,
-  //        client->m_connection_number);
+  // LOG("Websocket received %lu bytes of %s (%02x) data from client %u\n",
+  //     (unsigned long)datasize,
+  //     messageType,
+  //     opcode,
+  //     client->m_connection_number);
 
   if ((opcode & 0xf) == MG_WEBSOCKET_OPCODE_TEXT) {
     // text messages: we forward these to MAME
@@ -602,7 +751,7 @@ static void ws_close_handler(const struct mg_connection *conn, void *user_data) 
   client->m_connection = nullptr;
 
   /* DEBUG: Client has left. */
-  // printf("Client %u closing connection\n", client->m_connection_number);
+  // LOG("Client %u closing connection\n", client->m_connection_number);
 
   server->remove_client(client);
 
@@ -663,7 +812,7 @@ int main(int argc, char *argv[]) {
   for (int i = 1; i < argc; i++) {
     std::string_view arg(argv[i]);
     if (arg.starts_with("-")) {
-      // advance and grap the value for this flag
+      // advance and grab the value for this flag
       i++;
       std::optional<std::string_view> val;
       if (i < argc)
@@ -725,9 +874,6 @@ int main(int argc, char *argv[]) {
   // By default, gues it's a VFX, version 0.
   server.set_template_value("keyboard", "vfx");
   server.set_template_value("version", "0");
-
-  // std::cout << "Starting MAME connection thread" << std::endl;
-  std::thread mame_thread = server.start_mame_thread();
 
   /* Initialize CivetWeb library without OpenSSL/TLS support. */
   mg_init_library(0);
