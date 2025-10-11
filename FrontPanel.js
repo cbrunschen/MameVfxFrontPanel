@@ -249,7 +249,7 @@ class Display {
   }
 
   static segmentsForCharacter(c, underline, blink, blinkPhase) {
-    var lit = (c < 0 || 95 < c) ? 0 : Display.segmentsByCharacter[c];
+    var lit = (c < 0x20 || 0x7f < c) ? 0 : Display.segmentsByCharacter[c - 0x20];
     if (blink && !blinkPhase) {
       if (underline) {
         return lit;
@@ -277,7 +277,7 @@ class Display {
 
   showString(y, x, s) {
     for (var i = 0; i < s.length; i++) {
-      this.setChar(y, x, s.charCodeAt(i) - 0x20, false, false);
+      this.setChar(y, x, s.charCodeAt(i), false, false);
       x++;
       if (x >= this.cells[y].length) {
         x = 0;

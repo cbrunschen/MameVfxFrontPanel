@@ -61,8 +61,6 @@ static const char WS_URL[] = "/socket";
 
 static int connection_counter = 0;
 
-static int pipefds[2] = {0};
-
 struct Pipe {
   int r;
   int w;
@@ -75,6 +73,9 @@ struct Pipe {
     } else {
       r = w = -1;
     }
+  }
+  operator bool() {
+    return r >= 0 && w >= 0;
   }
   void checkRead(pollfd &pfd) {
     pfd.fd = r;
@@ -553,7 +554,7 @@ struct Server {
 
     while (true) {
       // LOG("p"); fflush(stdout);
-      if ((nfds = poll(pfds, 2, 10000)) >= 0) {
+      if ((nfds = poll(pfds, 2, 100 * 1000)) >= 0) {
         // LOG("%d", nfds); fflush(stdout);
         if (nfds == 0) {
           // timeout
@@ -821,7 +822,8 @@ static int serve_js(struct mg_connection *conn, void *user_data) {
 }
 
 int main(int argc, char *argv[]) {
-  if (pipe(pipefds)) {
+  Pipe p;
+  if (!p) {
     std::cerr << std::format("Cannot create pipe: {}", strerror(errno)) << std::endl;
     exit(1);
   }
@@ -964,11 +966,9 @@ int main(int argc, char *argv[]) {
   // std::cout << "Websocket server running" << std::endl;
 
   struct pollfd pfd;
-  pfd.fd = pipefds[0];
-  pfd.events = POLLIN;
-  while (poll(&pfd, 1, 10000) >= 0) {
-    pfd.fd = pipefds[0];
-    pfd.events = POLLIN;
+  p.checkRead(pfd);
+  while (poll(&pfd, 1, 1000 * 1000) >= 0) {
+    // nop
   }
   // std::cout << "Websocket server stopping" << std::endl;
 
