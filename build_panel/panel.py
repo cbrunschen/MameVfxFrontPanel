@@ -305,7 +305,7 @@ class Panel(PanelElement):
     self.onCondition("hasSeq")
     if self.isTrue():
       self.addButtonBelowDisplay     (70, 72.5, "#Seq",      51, SHADE_LIGHT)
-      self.addLabel(70, 87.5, 15, self.fontSize, "Seq", centered=True)
+      self.addLabel(70, 87.5, 15, self.fontSize, "Seq", centered=True, bold=True)
 
       self.addWhiteLine(285, 72.5 - 1.5 * self.fontSize - 0.05, 7.5, 0.25)
       self.addLabel(292.5, 72.5 - 2 * self.fontSize, 15, self.fontSize, "Tracks", centered=True)

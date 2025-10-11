@@ -1105,7 +1105,7 @@ class Panel {
     this.addLabel(385, 87.5, 35, 3.5, "Programming", 3.5, true, false, false);
     if (hasSeq) {
       this.addButton(70, 72.5, 15, 10, 51, Shade.LIGHT);
-      this.addLabel(70, 87.5, 15, 3.5, "Seq", 3.5, false, false, true);
+      this.addLabel(70, 87.5, 15, 3.5, "Seq", 3.5, true, false, true);
       this.addRectangle(285, 67.2, 7.5, 0.25, "#ffffff");
       this.addLabel(292.5, 65.5, 15, 3.5, "Tracks", 3.5, false, false, true);
       this.addRectangle(307.5, 67.2, 7.5, 0.25, "#ffffff");
