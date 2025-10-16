@@ -2,6 +2,17 @@ cmake_minimum_required(VERSION 3.10.0)
 set(TARGET "MameVfxFrontPanel")
 project(${TARGET} VERSION 0.1.0 LANGUAGES C CXX)
 
+find_package(Curses)
+if(Curses_FOUND AND NOT TARGET Curses::Curses)
+  add_library(Curses::Curses INTERFACE IMPORTED)
+  set_target_properties(
+    Curses::Curses
+    PROPERTIES
+      INTERFACE_LINK_LIBRARIES "${CURSES_LIBRARIES}"
+      INTERFACE_INCLUDE_DIRECTORIES "${CURSES_INCLUDE_DIRS}"
+  )
+endif()
+
 set(USE_SSL FALSE)
 
 add_executable(${TARGET})
@@ -54,6 +65,8 @@ else()
     "USE_SSL=0"
   )
 endif()
+
+target_link_libraries(${TARGET} PRIVATE Curses::Curses)
 
 target_sources(${TARGET} PRIVATE 
   main.cpp
