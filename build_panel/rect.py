@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from xml import *
+from myxml import *
 from util import *
 
 @dataclass

@@ -3,7 +3,7 @@
 from textwrap import dedent
 
 from panel import *
-from xml import *
+from myxml import *
 
 class MameLayoutVisitor(PanelVisitor):
   def __init__(self, keyboard):
@@ -41,7 +41,7 @@ class MameLayoutVisitor(PanelVisitor):
         self.layout_element(id="slider_~slider_id~", ref="invisible_rect", bounds=Rect(0.75, 0.75, 6.5, 22.5)),
         self.layout_element(ref="slider_knob", id="slider_knob_~slider_id~", contents=[
           self.layout_tag('animate', inputtag="~port_name~", inputmask="0x7f"),
-          self.layout_bounds(knobTop, state="100"),
+          self.layout_bounds(knobTop, state="1023"),
           self.layout_bounds(knobBottom, state="0"),
         ]),
       ]),

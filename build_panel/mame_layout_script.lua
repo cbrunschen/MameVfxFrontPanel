@@ -29,7 +29,7 @@ local sliders = {}   -- Stores slider information.
 local pointers = {}  -- Tracks pointer state.
 
 function clamp(x)
-  if x < 0 then return 0 elseif x > 100 then return 100 else return x end
+  if x < 0 then return 0 elseif x > 1023 then return 1023 else return x end
 end
 
 -- The knob's Y position must be animated using <animate inputtag="{port_name}">.
@@ -98,8 +98,8 @@ local function pointer_updated(type, id, dev, x, y, btn, dn, up, cnt)
   end
 
   -- A slider is selected. Update state and, indirectly, slider knob position,
-  -- based on the pointer's Y position. It is assumed the attached IO field is
-  -- an IPT_ADJUSTER with a range of 0-100 (the default).
+  -- based on the pointer's Y position. The attached IO field must be
+  -- an IPT_ADJUSTER with a range of 0-1023.
 
   local pointer = pointers[id]
   local slider = sliders[pointer.selected_slider]
@@ -108,7 +108,7 @@ local function pointer_updated(type, id, dev, x, y, btn, dn, up, cnt)
 
   local yy = y - pointer.dy
   local fraction = (yy - clickarea.bounds.y0) / (clickarea.bounds.height - knob.bounds.height)
-  local new_value = 100 * (1 - fraction)
+  local new_value = 1023 * (1 - fraction)
   new_value = math.floor(new_value + 0.5)
   clamped_value = clamp(new_value)
   slider.field.user_value = clamped_value
