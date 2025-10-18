@@ -44,7 +44,7 @@ The LUA code that is included with the generates MAME Layout files to enable the
 
 ## Supporting code
 
-### [`xml.py`](xml.py)
+### [`myxml.py`](myxml.py)
 
 XML helper classes used to generate the MAME Layout files.
 
