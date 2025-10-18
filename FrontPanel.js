@@ -722,68 +722,9 @@ class Panel {
     this.container.setAttribute("height", "375");
     this.container.setAttribute("overflow", "scroll");
 
-    this.decorationsContainer = createElement("g");
-    this.container.appendChild(this.decorationsContainer);
-
-    this.haloContainer = createElement("g");
-    this.container.appendChild(this.haloContainer);
-
-    this.labelContainer = createElement("g");
-    this.container.appendChild(this.labelContainer);
-
-    this.mainContainer = createElement("g");
-    this.container.appendChild(this.mainContainer);
-
-    this.displayContainer = createElement("svg");
-    this.display = new Display(this.displayContainer, 2, 40);
-    this.displayContainer.setAttribute("preserveAspectRatio", "xMidYMid meet");
-    this.displayContainer.setAttribute("x", displayRect.x);
-    this.displayContainer.setAttribute("y", displayRect.y);
-    this.displayContainer.setAttribute("width", displayRect.w);
-    this.displayContainer.setAttribute("height", displayRect.h);
-    this.container.appendChild(this.displayContainer);
-
-    this.buttons = new Array();
-    this.lights = new Array();
-    this.analogControls = new Array();
     this.populate(keyboard);
 
-    let messageRect = Rect.from(this.displayContainer);
-
-    this.messageBox = createElement('svg');
-    messageRect.applyTo(this.messageBox);
-    hideElement(this.messageBox);
-
-    let messageBackground = createElement('rect');
-    this.messageBox.appendChild(messageBackground);
-    messageBackground.setAttribute('width', '100%');
-    messageBackground.setAttribute('height', '100%');
-    messageBackground.setAttribute('fill', '#000000aa');
-
-    this.messageText = createElement('text');
-    this.messageBox.appendChild(this.messageText);
-
-    this.messageText.setAttribute('fill', "#aaaaaaff");
-    this.messageText.setAttribute('stroke', 'none');
-    this.messageText.setAttribute('font-size', `${messageRect.h}`);
-    this.messageText.setAttribute('font-family', 'Helvetica');
-    this.messageText.setAttribute('font-style', 'italic');
-    this.messageText.setAttribute('text-anchor', 'middle');
-    this.messageText.setAttribute('dominant-baseline', 'middle');
-    this.messageText.setAttribute('x', '50%');
-    this.messageText.setAttribute('y', '50%');
-
-    this.container.appendChild(this.messageBox);
-
-    this.serverUrl = serverUrl;
-    this.needRefresh = true;
-    try {
-      this.connect();
-    } catch (e) {
-      console.log("Unable to connect to '" + serverUrl + "': " + e);
-    }
-
-    this.blinkPhase = 0;
+    this.startConnection();
   }
 
   setBlinkPhase(blinkPhase) {
@@ -954,6 +895,42 @@ class Panel {
   }
 
   populate(keyboard) {
+    // Remove all existing children
+    while (this.container.lastChild) {
+      this.container.removeChild(this.container.lastChild);
+    }
+
+    // Note the current keyboard
+    this.keyboard = keyboard;
+
+    // and (re-)populate the container.
+    this.decorationsContainer = createElement("g");
+    this.container.appendChild(this.decorationsContainer);
+
+    this.haloContainer = createElement("g");
+    this.container.appendChild(this.haloContainer);
+
+    this.labelContainer = createElement("g");
+    this.container.appendChild(this.labelContainer);
+
+    this.mainContainer = createElement("g");
+    this.container.appendChild(this.mainContainer);
+
+    this.displayContainer = createElement("svg");
+    this.display = new Display(this.displayContainer, 2, 40);
+    this.displayContainer.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    this.displayContainer.setAttribute("x", displayRect.x);
+    this.displayContainer.setAttribute("y", displayRect.y);
+    this.displayContainer.setAttribute("width", displayRect.w);
+    this.displayContainer.setAttribute("height", displayRect.h);
+    this.container.appendChild(this.displayContainer);
+
+    this.buttons = new Array();
+    this.lights = new Array();
+    this.analogControls = new Array();
+
+    this.blinkPhase = 0;
+
     var hasSeq = false;
     var isSd1 = false;
     keyboard = keyboard.toLowerCase();
@@ -1165,6 +1142,42 @@ class Panel {
     }
     this.container.setAttribute("viewBox", "-95 -10 545.0 108.0");
 
+
+    let messageRect = Rect.from(this.displayContainer);
+
+    this.messageBox = createElement('svg');
+    messageRect.applyTo(this.messageBox);
+    hideElement(this.messageBox);
+
+    let messageBackground = createElement('rect');
+    this.messageBox.appendChild(messageBackground);
+    messageBackground.setAttribute('width', '100%');
+    messageBackground.setAttribute('height', '100%');
+    messageBackground.setAttribute('fill', '#000000aa');
+
+    this.messageText = createElement('text');
+    this.messageBox.appendChild(this.messageText);
+
+    this.messageText.setAttribute('fill', "#aaaaaaff");
+    this.messageText.setAttribute('stroke', 'none');
+    this.messageText.setAttribute('font-size', `${messageRect.h}`);
+    this.messageText.setAttribute('font-family', 'Helvetica');
+    this.messageText.setAttribute('font-style', 'italic');
+    this.messageText.setAttribute('text-anchor', 'middle');
+    this.messageText.setAttribute('dominant-baseline', 'middle');
+    this.messageText.setAttribute('x', '50%');
+    this.messageText.setAttribute('y', '50%');
+
+    this.container.appendChild(this.messageBox);
+  }
+
+  startConnection() {
+    this.needRefresh = true;
+    try {
+      this.connect();
+    } catch (e) {
+      console.log("Unable to connect to '" + serverUrl + "': " + e);
+    }
   }
 
   sendString(s) {
@@ -1304,15 +1317,7 @@ class Panel {
     var keyboard = parts[0];
     var version = parseInt(parts[1]);
     // console.log(`Server information message '${s}' -> keyboard '${keyboard}' version '${version}'`);
-    if (keyboard == this.keyboard && version == this.version) {
-      // console.log(`needRefresh = ${this.needRefresh}`);
-      // same keyboard type version - proceed!
-      if (this.needRefresh) {
-        // console.log("Requesting refresh");
-        this.sendString("CA1B1L1D1"); // Send me analog data, buttons, and display data
-        this.needRefresh = false; // presuming the refresh succeeds
-      }
-    } else {
+    if (version != this.version) {
       // we need to reload, forcing a refresh from the server.
       // console.log(`keyboard '${keyboard}' vs '${this.keyboard}', version '${version}' vs '${this.version}', would reload`);
 
@@ -1322,6 +1327,20 @@ class Panel {
       // (which gets cleared by reloading the page).
       const reload_timeout = 0;
       setTimeout(function() { document.location.reload(true); }, reload_timeout); // immediately reload
+    } else if (keyboard != this.keyboard) {
+      // we need to rebuild the panel, but can stay on the same software, no need to reload.
+      this.needRefresh = true;
+      this.populate(keyboard);
+      this.sendString("CA0B0L0D0"); // Send me nothing
+      this.sendString("CA1B1L1D1"); // Send me analog data, buttons, and display data - ie refresh everything
+    } else {
+      // console.log(`needRefresh = ${this.needRefresh}`);
+      // same keyboard type version - proceed!
+      if (this.needRefresh) {
+        // console.log("Requesting refresh");
+        this.sendString("CA1B1L1D1"); // Send me analog data, buttons, and display data
+        this.needRefresh = false; // presuming the refresh succeeds
+      }
     }
   }
 

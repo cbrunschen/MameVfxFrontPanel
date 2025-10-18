@@ -28,7 +28,8 @@ def main() -> int:
     visitor.visitPanel(p)
     print(visitor)
   else:
-    eprint(f'No visitor specified')
+    eprint(f'No visitor specified!')
+    parser.print_usage(stderr)
 
 if __name__ == '__main__':
   exit(main())

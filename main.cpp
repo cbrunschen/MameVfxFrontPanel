@@ -35,16 +35,22 @@
 #define HTML "FrontPanel.html"
 #define JS "FrontPanel.js"
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
 #define LOG_FUNCTION do { LOG("%s(), state = %d\r\n", __func__, m_mame_connection_state); } while(0)
 #define L(...) do { __VA_ARGS__; }while(0)
+#if DEBUG > 1
+#define LOGD(...) fprintf(stderr, __VA_ARGS__)
+#endif
 #else // DEBUG
 #define LOG(...) do{}while(0)
 #define LOG_FUNCTION do{}while(0)
 #define L(...) do{}while(0)
 #endif // DEBUG
+#ifndef LOGD
+#define LOGD(...) do{}while(0)
+#endif
 
 #if USE_SSL
 #include <openssl/ssl3.h>
@@ -313,6 +319,23 @@ struct Display {
     send("DX");
   }
 
+  void send_contents() {
+    send("DX");
+    for (int i = 0; i < 0x40; i++) {
+      send(std::format("L {:d} {:d}", i, light_states[i]));
+    }
+    std::ostringstream ss;
+    ss << "D C 0 0";
+    for (int row = 0; row < 2; row++) {
+      for (int col = 0; col < 40; col++) {
+        ss << std::format(" {:02x} {:x}", chars[row][col], attrs[row][col]);
+      }
+    }
+    std::string s(ss.str());
+    LOG("Display.send_contents(): '%s'\n", s.c_str());
+    send(s);
+  }
+
   void move_right() {
     col++;
     if (39 < col) {
@@ -337,12 +360,12 @@ struct Display {
 
   void handle_display_char(uint8_t c) {
     if (0x20 <= c && c < 0x7f)
-      LOG("HDC %02x '%c': ", c, c);
+      LOGD("HDC %02x '%c': ", c, c);
     else
-      LOG("HDC %02x    : ", c);
+      LOGD("HDC %02x    : ", c);
 
     if (calib) {
-      LOG("skipping next byte after calibration\r\n");
+      LOGD("skipping next byte after calibration\r\n");
       calib = false;
     } else if (light) {
       int light_number = c & 0x3f;
@@ -350,7 +373,7 @@ struct Display {
       auto light_state = (c & 0xc0) >> 6;
       light_states[light_number] = light_state;
 
-      LOG(" - %d %d\r\n", light_number, light_state);
+      LOGD(" - %d %d\r\n", light_number, light_state);
       send(std::format("L {:d} {:d}", light_number, light_state));
       light = false;
     } else if ((0x80 <= c) && (c < 0xd0)) {
@@ -358,85 +381,85 @@ struct Display {
       row = ((c & 0x7f) >= 40) ? 1 : 0;
       col = (c & 0x7f) % 40;
       attr = attrs[row][col];
-      LOG("%02x: -> (%d, %d)\r\n", c, row, col);
+      LOGD("%02x: -> (%d, %d)\r\n", c, row, col);
     } else if (0xd0 <= c) {
       // single-byte commands
       switch (c) {
         case 0xd0:  // blink start
-          LOG("d1: blink\r\n");
+          LOGD("d1: blink\r\n");
           attr |= ATTR_BLINK;
           break;
 
         case 0xd1:  // cancel all attributes
-          LOG("d1: cancel attributes\r\n");
+          LOGD("d1: cancel attributes\r\n");
           attr = 0;
           break;
 
         case 0xd2:  // blinking underline
-          LOG("d2: blinking underline\r\n");
+          LOGD("d2: blinking underline\r\n");
           attr |= ATTR_BLINK | ATTR_UNDERLINE;
           break;
 
         case 0xd3:  // underline
-          LOG("d3: underline\r\n");
+          LOGD("d3: underline\r\n");
           attr |= ATTR_UNDERLINE;
           break;
 
         case 0xd4:  // move curser one step right
-          LOG("d4: right %d", col);
+          LOGD("d4: right %d", col);
           move_right();
-          LOG(" -> %d\r\n", col);
+          LOGD(" -> %d\r\n", col);
           break;
 
           case 0xd5:  // move curser one step left
-          LOG("d5: left  %d", col);
+          LOGD("d5: left  %d", col);
           move_left();
-          LOG(" -> %d\r\n", col);
+          LOGD(" -> %d\r\n", col);
           break;
 
         case 0xd6:  // clear screen
-          LOG("d6: clear screen\r\n");
+          LOGD("d6: clear screen\r\n");
           clear_screen();
           break;
 
         case 0xf5:  // save cursor position
-          LOG("f5: save pos (%d, %d)\r\n", row, col);
+          LOGD("f5: save pos (%d, %d)\r\n", row, col);
           saved_col = col;
           saved_row = row;
           break;
 
         case 0xf6:  // restore cursor position
-          LOG("f6: restore pos (%d, %d)", row, col);
+          LOGD("f6: restore pos (%d, %d)", row, col);
           col = saved_col;
           row = saved_row;
-          LOG(" -> (%d, %d)\r\n", row, col);
+          LOGD(" -> (%d, %d)\r\n", row, col);
           attr = attrs[row][col];
           break;
 
         case 0xfb: // request calibration
-          LOG("0xff: calibration\r");
+          LOGD("0xff: calibration\r");
           calib = true;
           break;
 
         case 0xfd: // also clear screen?
-          LOG("fd: clear screen\r\n");
+          LOGD("fd: clear screen\r\n");
           clear_screen();
           break;
 
         case 0xff:
-          LOG("0xff: light\r\n");
+          LOGD("0xff: light\r\n");
           // button light state command
           light = true;
           break;
 
         default:
           char cx = chars[row][col];
-          LOG("Unknown control code %02x (@ %d, %d, %02x '%c')\r\n", c, row, col, cx, cx);
+          LOGD("Unknown control code %02x (@ %d, %d, %02x '%c')\r\n", c, row, col, cx, cx);
           break;
       }
     } else if ((0x20 <= c) && (c < 0x7f)) {
       // a character to display
-      LOG("[char %02x]\r\n", c);
+      LOGD("[char %02x]\r\n", c);
       chars[row][col] = c;
       attrs[row][col] = attr;
 
@@ -446,10 +469,10 @@ struct Display {
     } else if (c == 0x7f) {
       // DEL character -> move one step right? Nope - cursor just moves past column 39,
       // perhaps onto column 0 on the next row!
-      LOG("7f: Unknown function\r\n");
+      LOGD("7f: Unknown function\r\n");
     } else {
       char c = chars[row][col];
-      LOG("Unknown character code %02x (@ %d, %d, %02x '%c')\r\n", c, row, row, c, c);
+      LOGD("Unknown character code %02x (@ %d, %d, %02x '%c')\r\n", c, row, row, c, c);
     }
   }
 };
@@ -484,6 +507,7 @@ struct Server : Connected {
   Pipe m_mame_thread_commands;
 
   std::function<void(char)> handle_websocket_display_char;
+  std::function<void(void)> handle_send_contents;
 
   void handle_server_info(const std::string_view &message) {
     // try to parse this as server info
@@ -580,16 +604,26 @@ struct Server : Connected {
   void send_to_all_clients(const std::string &s, struct mg_connection *except = nullptr) {
     send_to_all_clients(s.c_str(), s.size(), except);
   }
+  
+  void send_contents() {
+    LOG("send_contents()\n");
+    if (handle_send_contents) {
+      LOG("- calling handle_send_contents()\n");
+      handle_send_contents();
+    } else {
+      LOG("- handle_send_contents is null\n");
+    }
+  }
 
   void send_to_mame(const char *data, size_t len) {
     lock();
     LOG_FUNCTION;
     if (m_mame_connection_state != cs_connected) {
-      LOG("Not connected to MAME, not sending.\r\n");
+      LOG("Not connected to MAME, not sending %d '%s'.\r\n", (int)len, std::string(std::string_view(data, (int)len)).c_str());
       return;
     }
     if (m_mame_conn) {
-      // LOG("Sending %d to MAME websocket\r\n", len);
+      LOG("Sending %d '%s' to MAME websocket\r\n", (int)len, std::string(std::string_view(data, (int)len)).c_str());
         mg_websocket_client_write(m_mame_conn, MG_WEBSOCKET_OPCODE_BINARY, data, len);
     } else if (m_mame_socket >= 0) {
       // LOG("Sending %d to MAME TCP socket\r\n", len);
@@ -866,7 +900,7 @@ struct Server : Connected {
       // Connected!
 
       set_mame_connection_state(cs_connected);
-      send_to_all_clients("DX", 2); // clear the clients' screen(s)
+      send_to_all_clients("DX"); // clear the clients' screen(s)
 
       MessageCollector<4096> collector;
 
@@ -874,12 +908,13 @@ struct Server : Connected {
       set_mame_connection(conn, sfd);
 
       // Send a couple of empty messages
-      send_to_mame("", 0);
-      send_to_mame("", 0);
+      send_to_mame("");
+      send_to_mame("");
       // Request the system information
-      send_to_mame("I", 1);
+      send_to_mame("I");
       // And request that MAME send us all the different kinds of data
-      send_to_mame("CA1B1D1", 7);
+      send_to_mame("CA0B0D0L0");
+      send_to_mame("CA1B1D1L1");
 
       while (true) {
         if (sfd >= 0) {
@@ -915,9 +950,11 @@ struct Server : Connected {
             Server &s;
             Guard(Server &s, Display &d) : s(s) {
               s.handle_websocket_display_char = [&d](char c) { d.handle_display_char(c); };
+              s.handle_send_contents = [&d]() { d.send_contents(); };
             }
             ~Guard() {
               s.handle_websocket_display_char = nullptr;
+              s.handle_send_contents = nullptr;
             }
           } guard(*this, display);
 
@@ -1031,6 +1068,7 @@ struct Server : Connected {
 
   std::string js() {
     if (m_webroot != "") {
+      LOG("fetching JS from '%s'\n", js_path().c_str());
       return load(js_path());
     } else {
       return jss;
@@ -1039,6 +1077,7 @@ struct Server : Connected {
 
   std::string html() {
     if (m_webroot != "") {
+      LOG("fetching HTML from '%s'\n", html_path().c_str());
       return load(html_path());
     } else {
       return htmls;
@@ -1211,12 +1250,17 @@ static int ws_data_handler(struct mg_connection *conn,
     server->send_to_mame(data, datasize);
 
     std::string_view message(data, datasize);
-    if (!(message.starts_with("I") || message.starts_with("C"))) {
+    if (message.starts_with("I")) {
+      // skip sending Information messages to other clients;
+      // those are server information requests.
+    } else if (message.starts_with("C")) {
+      // We handle the Control messages ourselves.
+      // In fact we simply send the entire set of data to the client.
+      LOG("'C' message: sending contents\n");
+      server->send_contents();
+    } else {
       // send to all connected clients except this one.
       server->send_to_all_clients(data, datasize, conn);
-    } else {
-      // skip sending Information and Control messages to other clients;
-      // those are server information requests.
     }
   } else if ((opcode & 0xf) == MG_WEBSOCKET_OPCODE_PING) {
     // send a PONG message in response
@@ -1427,6 +1471,7 @@ int main(int argc, char *argv[]) {
   /* Let the server run. */
   // L(std::cerr << "Websocket server running" << std::endl);
 
+#if BYCHAR
   initscr();
   cbreak();
 
@@ -1438,6 +1483,17 @@ int main(int argc, char *argv[]) {
       // no-op for now
     }
   }
+#else
+  int c;
+  while ((c = getchar()) != 'q') {
+    printf("Have char '%02x'\r\n", c);
+    std::string s;
+    switch(c) {
+      // no-op for now
+    }
+  }
+
+#endif
 
   /* Stop server, disconnect all clients. Then deinitialize CivetWeb library. */
   mg_stop(ctx);
