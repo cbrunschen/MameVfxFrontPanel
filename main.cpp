@@ -32,8 +32,8 @@
 
 #include "civetweb.h"
 
-#define HTML "FrontPanel.html"
-#define JS "FrontPanel.js"
+#define HTML "View.html"
+#define JS "View.js"
 
 #define DEBUG 0
 #if DEBUG
@@ -1465,8 +1465,8 @@ int main(int argc, char *argv[]) {
 
   mg_set_request_handler(ctx, "/", serve_html, &server);
   mg_set_request_handler(ctx, "/index.html", serve_html, &server);
-  mg_set_request_handler(ctx, "/FrontPanel.html", serve_html, &server);
-  mg_set_request_handler(ctx, "/FrontPanel.js", serve_js, &server);
+  mg_set_request_handler(ctx, "/View.html", serve_html, &server);
+  mg_set_request_handler(ctx, "/View.js", serve_js, &server);
 
   /* Let the server run. */
   // L(std::cerr << "Websocket server running" << std::endl);

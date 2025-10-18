@@ -2,10 +2,11 @@
 
 from textwrap import dedent
 
-from panel import *
+from rect import *
+from view import *
 from myxml import *
 
-class MameLayoutVisitor(PanelVisitor):
+class MameLayoutVisitor(ViewVisitor):
   def __init__(self, keyboard):
     self.keyboard = keyboard
     self.conditions = {

@@ -5,6 +5,8 @@ from rect import *
 from util import *
 from os import path
 
+from view import *
+
 # measured:
 # width of the 61 keys, from edge of white key to edge of white key,
 # not including space outside the keys but including the 'kerf' between the keys
@@ -37,34 +39,22 @@ def w_oct(i):
   return (w_white + kerf_x) * (7 * i) - kerf_x
 
 
-class KeyboardElement:
-  def accept(self, visitor: 'KeyboardVisitor') -> None:
-    pass
-
-class KeyboardVisitor:
-  def visitKey(self, bk: 'Key'):
-    pass
-
-  def visitKeyboard(self, kb: 'Keyboard'):
-    for k in kb.keys:
-      k.accept(self)
-
 @dataclass
-class Key(KeyboardElement):
+class Key(ViewElement):
   black: bool
   bounds: Rect
   number: int
 
-  def accept(self, visitor: KeyboardVisitor):
+  def accept(self, visitor: ViewVisitor):
     visitor.visitKey(self)
 
 @dataclass
-class Keyboard(KeyboardElement):
+class Keyboard(ViewElement):
   octaves: int
   # this will be populated
-  keys: list[KeyboardElement] = field(default_factory=list)
+  keys: list[Key] = field(default_factory=list)
 
-  def accept(self, visitor: KeyboardVisitor):
+  def accept(self, visitor: ViewVisitor):
     visitor.visitKeyboard(self)
 
   @property
@@ -75,8 +65,9 @@ class Keyboard(KeyboardElement):
 
     # b is now the rectangle of akk the keys with internal kerf, but no external space.
     # Add 2.5mm laterally and 5.0 mm below.
-    b = Rect(b.x - 2.5, b.y, b.width + 5.0, b.height + 5.0)
+    b = Rect(b.x - 2.5, b.y, b.w + 5.0, b.h + 5.0)
+    return b
 
   def __post_init__(self):
-    
+    pass
 

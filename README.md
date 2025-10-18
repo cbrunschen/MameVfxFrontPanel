@@ -4,13 +4,13 @@
 as plain HTTP. It is implemented using the [CivetWeb](https://github.com/civetweb/civetweb) embeddable
 web server.
 
-It can connect to either the websocket that's exposed by MAME's master branch at the time of writing, or the remote panel support that was previously implemented in [#14131](https://github.com/mamedev/mame/pull/14131), though that has been removed, for now.
+It can connect to either the websocket that's exposed by MAME's master branch at the time of writing, or the remote view support that was previously implemented in [#14131](https://github.com/mamedev/mame/pull/14131), though that has been removed, for now.
 
-By default, `MameVfxFrontPanel` serves its contents on all local interfaces on port `9090`: You can access the front panel as [http://localhost:9090/](http://localhost:9090/).
+By default, `MameVfxFrontPanel` serves its contents on all local interfaces on port `9090`: You can access the view as [http://localhost:9090/](http://localhost:9090/).
 
 You can optionally build `MameVfxFrontPanel` with OpenSSL support by specifying `USE_SSL` as `TRUE` in 
 [CMakeLists.txt](CMakeLists.txt) on line 5. In that case, the build process uses `openssl` to create a
-new key and a self-signed certificate, and the front panel can also be accessed at 
+new key and a self-signed certificate, and the view can also be accessed at 
 [https://localhost:8443/](https://localhost:8443/).
  
 `MameVfxFrontPanel` connects to a locally running instance of MAME either through its http server's websocket on port 8080, or with the bespoke protocol on port `15112`, the [default value for MAME's `comm_localport` option](https://github.com/mamedev/mame/blob/b6df5c4970f9704449ca1c94310c30e4e6d3bc6a/src/emu/emuopts.cpp#L192) at the time of writing.
@@ -65,7 +65,7 @@ $ mame sd132
 $ MameVfxFrontPanel
 ```
 
-in another terminal on the same machine starts `MameVfxFrontPanel`, connecting to MAME as started above, serving the front panel on [http://localhost:9090/](http://localhost:9090/).
+in another terminal on the same machine starts `MameVfxFrontPanel`, connecting to MAME as started above, serving the view on [http://localhost:9090/](http://localhost:9090/).
 
 As long as a web browser is connected to `MameVfxFrontPanel`, it will keep the connection to MAME alive. If connection to MAME is lost, `MameVfxFrontPanel`
 will attempt to reconnect, once every second, until it succeeds or is stopped.
@@ -84,7 +84,7 @@ $ MameVfxFrontPanel -direct localhost:9000
 
 `MameVfxFrontPanel` currently builds on Linux with `cmake` using `clang++` 20. It requires support for `#embed` to embed the HTML and JavaScript source files into the binary.
 
-# [`build_panel`](build_panel)
+# [`build_view`](build_view)
 
-The project also includes the [`build_panel`](build_panel) directory, which contains a Python program that generates the panel itself, either as JavaScript code for use in `MameVfxFrontPanel` or as individual [MAME layout files](https://docs.mamedev.org/techspecs/layout_files.html) for the `vfx`, `vfxsd` and `sd1` / `sd132` keyboards, for inclusion in MAME itself. See [`build_panel/README.md`](build_panel/README.md) for more details.
+The project also includes the [`build_view`](build_view) directory, which contains a Python program that generates the view itself, either as JavaScript code for use in `MameVfxFrontPanel` or as individual [MAME layout files](https://docs.mamedev.org/techspecs/layout_files.html) for the `vfx`, `vfxsd` and `sd1` / `sd132` keyboards, for inclusion in MAME itself. See [`build_view/README.md`](build_view/README.md) for more details.
 

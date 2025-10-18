@@ -3,9 +3,9 @@
 from textwrap import indent, dedent, wrap
 from dataclasses import dataclass, field
 
-from panel import *
+from view import *
 
-class HTMLJSVisitor(PanelVisitor):
+class HTMLJSVisitor(ViewVisitor):
 
   def __init__(self):
     self.indent = '    '
@@ -84,5 +84,5 @@ class HTMLJSVisitor(PanelVisitor):
     self.append(f'this.addSymbol({symbol.bounds.coords()}, "{symbol.name}");')
   
   def __str__(self):
-    (preamble, postamble) = self.load("FrontPanel.js").split('//CODE//')
+    (preamble, postamble) = self.load("View.js").split('//CODE//')
     return '\n'.join([preamble] + self.code + [postamble])

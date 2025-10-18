@@ -28,11 +28,11 @@ displayRect = charsRect.fitWithin(roughDisplayRect)
 
 displayGlassRect = Rect(25, -5, 230, 67.5)
 
-class PanelElement:
-  def accept(self, visitor: 'PanelVisitor') -> None:
+class ViewElement:
+  def accept(self, visitor: 'ViewVisitor') -> None:
     pass
 
-class PanelVisitor:
+class ViewVisitor:
   def defaultFontSize(self):
     return 3.5
   
@@ -73,32 +73,32 @@ class PanelVisitor:
     pass
 
 @dataclass
-class AccentColor(PanelElement):
+class AccentColor(ViewElement):
   rgb: str
 
-  def accept(self, visitor: PanelVisitor):
+  def accept(self, visitor: ViewVisitor):
     visitor.visitAccentColor(self)
 
 @dataclass
-class Display(PanelElement):
+class Display(ViewElement):
   bounds: Rect
 
-  def accept(self, visitor: PanelVisitor):
+  def accept(self, visitor: ViewVisitor):
     visitor.visitDisplay(self)
 
 @dataclass
-class Button(PanelElement):
+class Button(ViewElement):
   bounds: Rect
   label: str
   number: int
   shade: Shade
-  light: 'Light' = None
+  light: 'Light|None' = None
 
   def accept(self, visitor):
     visitor.visitButton(self)
 
 @dataclass
-class Light(PanelElement):
+class Light(ViewElement):
   bounds: Rect
   number: int
 
@@ -106,7 +106,7 @@ class Light(PanelElement):
     visitor.visitLight(self)
 
 @dataclass
-class Slider(PanelElement):
+class Slider(ViewElement):
   bounds: Rect
   channel: int
   name: str
@@ -115,7 +115,7 @@ class Slider(PanelElement):
     visitor.visitSlider(self)
 
 @dataclass
-class Label(PanelElement):
+class Label(ViewElement):
   bounds: Rect
   text: str
   fontSize: float
@@ -127,7 +127,7 @@ class Label(PanelElement):
     visitor.visitLabel(self)
 
 @dataclass
-class Rectangle(PanelElement):
+class Rectangle(ViewElement):
   bounds: Rect
   color: str
     
@@ -135,7 +135,7 @@ class Rectangle(PanelElement):
     visitor.visitRectangle(self)
 
 @dataclass
-class Symbol(PanelElement):
+class Symbol(ViewElement):
   bounds: Rect
   name: str
   color: str
@@ -144,11 +144,11 @@ class Symbol(PanelElement):
     visitor.visitSymbol(self)
 
 @dataclass
-class Conditional(PanelElement):
+class Conditional(ViewElement):
   condition: str
-  ifTrue: list[PanelElement] = field(default_factory=list)
-  ifFalse: list[PanelElement] = field(default_factory=list)
-  items: list[PanelElement] = None
+  ifTrue: list[ViewElement] = field(default_factory=list)
+  ifFalse: list[ViewElement] = field(default_factory=list)
+  items: list[ViewElement]|None = None
 
   def isTrue(self):
     self.items = self.ifTrue
@@ -166,14 +166,14 @@ class Conditional(PanelElement):
     visitor.visitConditional(self)
 
 @dataclass
-class Panel(PanelElement):
+class Panel(ViewElement):
   fontSize: float
   # these are all internal variables really
-  keyboard: str = None
+  keyboard: str|None = None
   bounds: Rect = field(default_factory=lambda: Rect(0, 0, 0, 0))
-  background: Rectangle = None
-  conditional: Conditional = None
-  items: list[PanelElement] = field(default_factory=list)
+  background: Rectangle|None = None
+  conditional: Conditional|None = None
+  items: list[ViewElement] = field(default_factory=list)
 
   color_vfx = "#299ca3"
   color_sd1 = "#db5f6a"
@@ -429,10 +429,10 @@ class Panel(PanelElement):
     self.conditional = conditional
   
   def isTrue(self):
-    return self.conditional.isTrue()
+    return self.conditional.isTrue() if self.conditional is not None else False
 
   def isFalse(self):
-    return self.conditional.isFalse()
+    return self.conditional.isFalse() if self.conditional is not None else False
 
   def endCondition(self):
-    self.conditional = self.conditional.end()
+    self.conditional = self.conditional.end() if self.conditional is not None else None

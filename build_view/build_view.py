@@ -5,11 +5,11 @@ from dataclasses import dataclass, field
 from sys import argv, exit
 from argparse import ArgumentParser
 
-from panel import *
+from view import *
 from mame_layout import *
 from js_html import *
 
-def main() -> int:
+def main():
   parser = ArgumentParser()
   group = parser.add_mutually_exclusive_group()
   group.add_argument('-l', '--layout', choices=['vfx','vfxsd','sd1'])

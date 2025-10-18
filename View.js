@@ -1329,15 +1329,16 @@ class Panel {
       setTimeout(function() { document.location.reload(true); }, reload_timeout); // immediately reload
     } else if (keyboard != this.keyboard) {
       // we need to rebuild the panel, but can stay on the same software, no need to reload.
-      this.needRefresh = true;
+      console.log("Rebuilding the panel in place");
       this.populate(keyboard);
       this.sendString("CA0B0L0D0"); // Send me nothing
       this.sendString("CA1B1L1D1"); // Send me analog data, buttons, and display data - ie refresh everything
     } else {
       // console.log(`needRefresh = ${this.needRefresh}`);
-      // same keyboard type version - proceed!
+      // same keyboard type and version - proceed!
       if (this.needRefresh) {
         // console.log("Requesting refresh");
+        this.sendString("CA0B0L0D0"); // Send me nothing
         this.sendString("CA1B1L1D1"); // Send me analog data, buttons, and display data
         this.needRefresh = false; // presuming the refresh succeeds
       }
