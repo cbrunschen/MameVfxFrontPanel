@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10.0)
-set(TARGET "MameVfxFrontPanel")
+set(TARGET "MameVfxRemoteView")
 project(${TARGET} VERSION 0.1.0 LANGUAGES C CXX)
 
 find_package(Curses)
