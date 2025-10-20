@@ -10,7 +10,7 @@ def to_id(s):
      finally case-fold."""
   return sub(r'[^a-zA-Z0-9]', '_', s.replace('-\n','')).casefold()
 
-def clean(d: dict[str, str]) -> dict[str, str]:
+def clean(d: dict[str, str|None]) -> dict[str, str]:
   return { k : v for (k, v) in d.items() if v != None }
 
 def rgb_components(rgb):
