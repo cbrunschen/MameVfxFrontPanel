@@ -129,6 +129,7 @@ class MameLayoutVisitor(ViewVisitor):
     self.slider_uses = []
     self.decoration_uses = []
     self.vfd_uses = []
+    self.code = []
 
   def layout_bounds(self, bounds, state=None):
     return bounds.toBounds(state)
@@ -206,7 +207,7 @@ class MameLayoutVisitor(ViewVisitor):
       'align': align
     }), [])
     if color != None:
-      e.append(self.layoutColor(color))
+      e.append(self.layout_color(color))
     return e
 
   def layout_param(self, k, v):
@@ -250,7 +251,7 @@ class MameLayoutVisitor(ViewVisitor):
       ], name=shape_name)
       self.button_shapes[shape_name] = definition
     
-    inputtag = "buttons_0" if button.number < 32 else "buttons_32"
+    inputtag = ":panel:" + ("buttons_0" if button.number < 32 else "buttons_32")
     mask = 1 << (button.number % 32)
     inputmask = f'0x{mask:08x}'
 
@@ -307,9 +308,10 @@ class MameLayoutVisitor(ViewVisitor):
   def visitSlider(self, slider: 'Slider'):
     self.slider_uses.extend([
       self.layout_param('slider_id', slider.name),
-      self.layout_param('port_name', f"analog_{slider.name}"),
+      self.layout_param('port_name', f":panel:analog_{slider.name}"),
       self.layout_group(ref="slider", bounds=slider.bounds)
     ])
+    self.code.append(f'\t\t\tadd_vertical_slider(view, "slider_{slider.name}", "slider_knob_{slider.name}", ":panel:analog_{slider.name}")')
 
   def visitRectangle(self, rectangle: 'Rectangle'):
     if rectangle.color == 'accent':
@@ -378,8 +380,10 @@ class MameLayoutVisitor(ViewVisitor):
     ])
     layout.append(view)
 
+    (preamble, postamble) = self.load("mame_layout_script.lua").split('--CODE--')
+
     script = Element('script', {}, [
-      CDATA(self.load("mame_layout_script.lua"))
+      CDATA('\n'.join([preamble] + self.code + [postamble]))
     ])
     layout.append(script)
 

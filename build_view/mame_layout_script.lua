@@ -7,10 +7,7 @@ file:set_resolve_tags_callback(
 
     for view_name, view in pairs(file.views) do
       install_slider_callbacks(view)
-
-      add_vertical_slider(view, "slider_volume", "slider_knob_volume", "analog_volume")
-      add_vertical_slider(view, "slider_data_entry", "slider_knob_data_entry", "analog_data_entry")
-
+      --CODE--
       -- TODO: Display a warning about how to enable sliders
       -- view.items["warning"]:set_state(0)
     end
@@ -50,7 +47,7 @@ function add_vertical_slider(view, clickarea_id, knob_id, port_name)
     return
   end
 
-  local port = file.device:ioport(port_name)
+  local port = machine.ioport.ports[port_name]
   if port == nil then
     emu.print_error("Port: '" .. port_name .. "' not found.")
     return
