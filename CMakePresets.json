@@ -2,8 +2,8 @@
   "version": 8,
   "configurePresets": [
     {
-      "name": "Default",
-      "displayName": "Clang 19.1.1 x86_64-pc-linux-gnu",
+      "name": "clang20",
+      "displayName": "Clang 20.1.2 x86_64-pc-linux-gnu",
       "description": "Using compilers: C = /usr/bin/clang, CXX = /usr/bin/clang++",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
